@@ -1,0 +1,45 @@
+{
+  "name": "claudescope",
+  "version": "0.1.0",
+  "description": "Local-first analytics & full-text search for your Claude Code sessions. Zero config, zero network, one command.",
+  "type": "module",
+  "bin": {
+    "claudescope": "bin/claudescope.js"
+  },
+  "scripts": {
+    "start": "node bin/claudescope.js",
+    "test": "node --test"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "analytics",
+    "dashboard",
+    "usage",
+    "tokens",
+    "cost",
+    "cli",
+    "local-first"
+  ],
+  "author": "Joni Martin (@JoniMartin27)",
+  "license": "MIT",
+  "homepage": "https://github.com/JoniMartin27/claudescope#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoniMartin27/claudescope.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JoniMartin27/claudescope/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

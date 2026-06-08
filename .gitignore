@@ -1,0 +1,8 @@
+node_modules/
+.server.log
+*.log
+.DS_Store
+.claude/
+npm-debug.log*
+.env
+.github/workflows/
