@@ -26,8 +26,8 @@ const PRICES = [
   { match: /haiku/i, input: 0.25, output: 1.25 },
 ];
 
-const CACHE_WRITE_MULT = 1.25;
-const CACHE_READ_MULT = 0.1;
+export const CACHE_WRITE_MULT = 1.25;
+export const CACHE_READ_MULT = 0.1;
 
 export function priceForModel(model) {
   if (!model) return null;

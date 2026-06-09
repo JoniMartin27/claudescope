@@ -1,10 +1,15 @@
 {
   "name": "claudescope-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first analytics & full-text search for your Claude Code sessions. Zero config, zero network, one command.",
   "type": "module",
   "bin": {
     "claudescope": "bin/claudescope.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "start": "node bin/claudescope.js",
@@ -23,11 +28,14 @@
     "anthropic",
     "analytics",
     "dashboard",
+    "search",
+    "session-search",
     "usage",
     "tokens",
     "cost",
     "cli",
-    "local-first"
+    "local-first",
+    "privacy"
   ],
   "author": "Joni Martin (@JoniMartin27)",
   "license": "MIT",

@@ -97,8 +97,8 @@ test('parseAll + buildAnalytics + search end to end', async () => {
   assert.ok(a.byTool.find((t) => t.tool === 'Read'));
   assert.ok(a.totals.cost > 0);
   const hits = search(messages, 'parser bug');
-  assert.ok(hits.length >= 1);
-  assert.equal(hits[0].role, 'user');
-  assert.equal(search(messages, 'zzz-no-match').length, 0);
+  assert.ok(hits.results.length >= 1);
+  assert.equal(hits.results[0].role, 'user');
+  assert.equal(search(messages, 'zzz-no-match').results.length, 0);
   fs.rmSync(dir, { recursive: true, force: true });
 });

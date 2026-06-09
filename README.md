@@ -4,7 +4,7 @@
 
 # 🔭 ClaudeScope
 
-**See where your Claude Code time, tokens and money actually go — and search every session you've ever run.**
+**Full-text search across every Claude Code session you've ever run — in your browser, with zero install and zero network. Plus the usage dashboard your subscription doesn't show you.**
 
 [![tests](https://img.shields.io/badge/tests-passing-4ade80)](test/)
 [![npm](https://img.shields.io/npm/v/claudescope-cli?color=cb3837&logo=npm)](https://www.npmjs.com/package/claudescope-cli)
@@ -31,28 +31,30 @@ npx claudescope-cli
 
 ## The problem
 
-If you use [Claude Code](https://claude.com/claude-code), you've quietly generated **gigabytes of session transcripts** sitting in `~/.claude/projects/` — every prompt, every reply, every tool call, every token. And you can see **none of it**:
+You solved this exact bug with Claude Code three weeks ago. **Which session was it in?** `claude --resume` shows you a wall of session IDs and timestamps — no content, no cross-project search. Your answer is sitting right there in `~/.claude/projects/`, locked inside **gigabytes of raw `.jsonl`** you can't grep.
 
-- 💸 *How many tokens am I actually burning? What would that cost on the API?*
+ClaudeScope gives you **instant full-text search across every prompt, reply and tool call** you've ever run — and a session viewer to actually read the one you found. It also surfaces the usage you can't otherwise see:
+
+- 🔎 *"Find the session where I set up the Postgres driver"* — search content, jump in, read it.
+- 💸 *How many tokens am I burning, and what would caching have cost me?*
 - 🗂️ *Which projects eat the most of my Claude time?*
-- 🛠️ *Which tools does Claude lean on — Bash, Edit, Read…?*
+- 🛠️ *Which tools does Claude lean on, and where did it go the wrong way?*
 - ⏰ *When am I most productive with it?*
-- 🔎 *"I solved this exact bug with Claude three weeks ago… in which session?"*
 
-That data is locked inside thousands of raw `.jsonl` lines. **ClaudeScope unlocks it** — turning your local history into a fast, private, beautiful dashboard, with full-text search across everything.
+All of it from the transcripts already on your disk — **100% local, zero network**, one command.
 
 ## What you get
 
 | | |
 |---|---|
-| 📊 **Usage at a glance** | Sessions, messages, tokens and estimated API-equivalent cost as headline stats. |
-| 🍩 **Token mix** | Input vs. output vs. cache read/write — see exactly where your tokens go (hint: it's mostly cache). |
-| 🗂️ **Per-project breakdown** | Cost and tokens ranked by project, so you know what's actually expensive. |
-| 🤖 **Model split** | Opus vs. Sonnet vs. Haiku usage across all your work. |
-| 🛠️ **Tool leaderboard** | The tools Claude reaches for most, ranked. |
-| 🔥 **Activity heatmap** | Your coding rhythm by weekday × hour of day. |
-| 📈 **Cost timeline** | Spending trend across your last 60 active days. |
-| 🔎 **Full-text search** | Instantly grep every prompt, reply and tool call across **all** sessions, with highlighting. |
+| 🔎 **Full-text search** | Instantly grep every prompt, reply and **tool-call input** across all sessions, with highlighting — filter by role/project. |
+| 📖 **Session viewer** | Click any result to read the full conversation — prompts, replies, tool calls — in place. |
+| 🗓️ **Date-range filter** | Scope the whole dashboard to the last 7 / 30 / 90 days, or all time. |
+| 📊 **Usage at a glance** | Sessions, messages, tokens, estimated API-equivalent cost, and **how much caching saved you**. |
+| 🍩 **Token mix & model spend** | Where your tokens go (hint: mostly cache) and cost per model. |
+| 🧭 **Typical session** | Median / p90 cost, messages and duration — plus interrupted-session detection. |
+| 🔥 **Activity heatmap & timeline** | Your rhythm by weekday × hour, and daily trend by cost **or** tokens. |
+| ⬇️ **Export** | One click to a Markdown summary, per-day CSV, or raw JSON. |
 
 ## Quick start
 

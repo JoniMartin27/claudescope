@@ -1,9 +1,11 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseAll } from './parser.js';
+import { parseAll, readConversation } from './parser.js';
 import { buildAnalytics, search } from './analytics.js';
+import { projectsDir } from './paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -16,14 +18,19 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
 };
 
-function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, { 'Content-Type': type });
+function send(res, status, body, type = 'application/json; charset=utf-8', extra) {
+  res.writeHead(status, { 'Content-Type': type, ...(extra || {}) });
   res.end(body);
 }
+function sendJson(res, status, obj) {
+  send(res, status, JSON.stringify(obj));
+}
+
+const RANGES = { '7d': 7, '30d': 30, '90d': 90 };
 
 function serveStatic(res, urlPath) {
   let rel = urlPath === '/' ? '/index.html' : urlPath;
-  rel = rel.split('?')[0];
+  rel = decodeURIComponent(rel.split('?')[0]);
   const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
   // Boundary-aware check: a bare startsWith would also accept a sibling dir
   // sharing the prefix (e.g. "public-secret/"). Require an exact match or a
@@ -43,24 +50,87 @@ export async function createServer(claudeDir, { onLog } = {}) {
   log('Scanning transcripts…');
   const t0 = Date.now();
   const { sessions, messages } = await parseAll(claudeDir);
-  const analytics = buildAnalytics(sessions);
   log(`Parsed ${sessions.length} sessions, ${messages.length} messages in ${Date.now() - t0}ms`);
 
-  const server = http.createServer((req, res) => {
-    const url = req.url || '/';
-    if (url.startsWith('/api/analytics')) {
-      return send(res, 200, JSON.stringify(analytics));
+  // Map sessionId -> transcript file so the detail view can re-read on demand.
+  const sessionIndex = new Map();
+  for (const s of sessions) {
+    if (!sessionIndex.has(s.sessionId)) sessionIndex.set(s.sessionId, { project: s.project, file: s.file });
+  }
+
+  // Cache the serialized analytics payload per range (cheap rebuild, but the
+  // "all" view is requested on every load — serialize once, reuse + ETag).
+  const cache = new Map(); // range -> { json, etag }
+  function analyticsFor(range) {
+    const key = RANGES[range] ? range : 'all';
+    if (cache.has(key)) return cache.get(key);
+    let subset = sessions;
+    if (RANGES[key]) {
+      const since = Date.now() - RANGES[key] * 86400000;
+      subset = sessions.filter((s) => s.lastTs && new Date(s.lastTs).getTime() >= since);
     }
-    if (url.startsWith('/api/search')) {
-      const u = new URL(url, 'http://localhost');
-      const q = u.searchParams.get('q') || '';
-      return send(res, 200, JSON.stringify(search(messages, q)));
+    const payload = { ...buildAnalytics(subset), range: key };
+    const json = JSON.stringify(payload);
+    const etag = '"' + crypto.createHash('sha1').update(json).digest('hex').slice(0, 16) + '"';
+    const entry = { json, etag };
+    cache.set(key, entry);
+    return entry;
+  }
+
+  const server = http.createServer(async (req, res) => {
+    let pathname = '/';
+    let params = new URLSearchParams();
+    try {
+      const u = new URL(req.url || '/', 'http://localhost');
+      pathname = u.pathname;
+      params = u.searchParams;
+    } catch {
+      return sendJson(res, 400, { error: 'bad request' });
     }
-    if (url.startsWith('/api/meta')) {
-      return send(res, 200, JSON.stringify({ claudeDir, sessions: sessions.length, messages: messages.length }));
+
+    if (pathname === '/api/analytics') {
+      const { json, etag } = analyticsFor(params.get('range') || 'all');
+      if (req.headers['if-none-match'] === etag) {
+        res.writeHead(304, { ETag: etag });
+        return res.end();
+      }
+      return send(res, 200, json, 'application/json; charset=utf-8', { ETag: etag, 'Cache-Control': 'no-cache' });
     }
-    return serveStatic(res, url);
+
+    if (pathname === '/api/search') {
+      const q = params.get('q') || '';
+      const out = search(messages, q, {
+        limit: parseInt(params.get('limit') || '100', 10),
+        role: params.get('role') || undefined,
+        project: params.get('project') || undefined,
+      });
+      return sendJson(res, 200, out);
+    }
+
+    if (pathname === '/api/session') {
+      const id = params.get('id');
+      const ref = id && sessionIndex.get(id);
+      if (!ref) return sendJson(res, 404, { error: 'session not found' });
+      const filePath = path.join(projectsDir(claudeDir), ref.project, ref.file);
+      try {
+        const convo = await readConversation(filePath, id);
+        return sendJson(res, 200, convo);
+      } catch {
+        return sendJson(res, 500, { error: 'could not read session transcript' });
+      }
+    }
+
+    if (pathname === '/api/meta') {
+      return sendJson(res, 200, { claudeDir, sessions: sessions.length, messages: messages.length });
+    }
+
+    if (pathname.startsWith('/api/')) {
+      return sendJson(res, 404, { error: 'unknown endpoint' });
+    }
+
+    return serveStatic(res, req.url || '/');
   });
 
-  return { server, analytics, sessions, messages };
+  const analytics = JSON.parse(analyticsFor('all').json);
+  return { server, analytics, sessions, messages, analyticsFor };
 }

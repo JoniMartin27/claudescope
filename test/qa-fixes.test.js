@@ -50,7 +50,7 @@ test('search finds terms well beyond the first 2000 characters', async () => {
       message: { role: 'user', content: `${filler} NEEDLEWORD ${filler}` } },
   ]);
   const { messages } = await parseAll(dir);
-  assert.equal(search(messages, 'needleword').length, 1, 'must match a term ~3000 chars in');
+  assert.equal(search(messages, 'needleword').results.length, 1, 'must match a term ~3000 chars in');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -21,7 +21,29 @@
       </header>
 
       <main>
+        <section class="toolbar">
+          <div class="seg" id="rangeBar" role="group" aria-label="Time range">
+            <button data-range="7d" type="button">7d</button>
+            <button data-range="30d" type="button">30d</button>
+            <button data-range="90d" type="button">90d</button>
+            <button data-range="all" class="active" type="button">All</button>
+          </div>
+          <div class="export-wrap">
+            <button id="exportBtn" type="button" aria-haspopup="true">⬇ Export</button>
+            <div id="exportMenu" class="export-menu" hidden>
+              <button data-export="md" type="button">Markdown summary</button>
+              <button data-export="csv" type="button">Per-day CSV</button>
+              <button data-export="json" type="button">Raw JSON</button>
+            </div>
+          </div>
+        </section>
+
         <section class="cards" id="cards"></section>
+
+        <section class="panel typical-panel">
+          <h2>Typical session <span class="sub">(across the selected range)</span></h2>
+          <div id="typical" class="typical"></div>
+        </section>
 
         <section class="search-block">
           <div class="search-wrap">
@@ -34,7 +56,12 @@
 
         <div class="grid">
           <section class="panel span2">
-            <h2>Activity over time</h2>
+            <h2>Activity over time
+              <span class="seg sm" id="tlToggle" role="group" aria-label="Timeline metric">
+                <button data-metric="cost" class="active" type="button">Cost</button>
+                <button data-metric="tokens" type="button">Tokens</button>
+              </span>
+            </h2>
             <div id="timeline" class="timeline"></div>
           </section>
 
@@ -65,10 +92,20 @@
         </div>
 
         <section class="panel">
-          <h2>Most expensive sessions <span class="sub">(estimated API-equivalent cost)</span></h2>
+          <h2>Most expensive sessions <span class="sub">(estimated API-equivalent cost · click to read)</span></h2>
           <div id="sessions" class="sessions"></div>
         </section>
       </main>
+
+      <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+          <div class="modal-bar">
+            <h3 id="modalTitle">Session</h3>
+            <button class="modal-close" data-close type="button" aria-label="Close">✕</button>
+          </div>
+          <div id="modalBody" class="modal-body"></div>
+        </div>
+      </div>
 
       <footer>
         <p>

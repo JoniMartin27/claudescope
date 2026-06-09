@@ -42,8 +42,10 @@ function help() {
   npx claudescope --port 4317     Use a custom port
   npx claudescope --no-open       Don't auto-open the browser
   npx claudescope --json          Print analytics as JSON to stdout and exit
+  npx claudescope --json --output usage.json   Write the JSON to a file
   npx claudescope --dir <path>    Point at a specific .claude directory
-  npx claudescope --help          Show this help
+  npx claudescope --version       Print the version (-v)
+  npx claudescope --help          Show this help (-h)
 
 ${C.bold}Privacy${C.reset}
   100% local. Reads your transcripts from disk, serves a dashboard on
@@ -64,6 +66,10 @@ function openBrowser(url) {
 }
 
 async function main() {
+  if (has('--version') || has('-v')) {
+    process.stdout.write(pkg.version + '\n'); // bare + machine-parseable
+    return;
+  }
   if (has('--help') || has('-h')) return help();
 
   const explicitDir = opt('--dir', null);
@@ -97,7 +103,14 @@ async function main() {
 
   if (has('--json')) {
     const { sessions } = await parseAll(claudeDir);
-    process.stdout.write(JSON.stringify(buildAnalytics(sessions), null, 2) + '\n');
+    const json = JSON.stringify(buildAnalytics(sessions), null, 2);
+    const outFile = opt('--output', null) || opt('-o', null);
+    if (outFile) {
+      fs.writeFileSync(outFile, json + '\n'); // utf8, no BOM
+      console.error(`Wrote analytics to ${outFile}`);
+    } else {
+      process.stdout.write(json + '\n');
+    }
     return;
   }
 
@@ -115,6 +128,15 @@ async function main() {
     console.log(`   ${C.dim}Press Ctrl+C to stop.${C.reset}\n`);
     if (!has('--no-open')) openBrowser(url);
   });
+
+  // Clean shutdown on Ctrl+C / termination.
+  const shutdown = () => {
+    console.log(`\n   ${C.dim}Shutting down. Bye 🔭${C.reset}`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 500).unref();
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

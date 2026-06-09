@@ -1,7 +1,30 @@
-import { costForUsage } from './pricing.js';
+import { priceForModel, CACHE_READ_MULT } from './pricing.js';
 
 function usageTokens(u) {
   return (u.input || 0) + (u.output || 0) + (u.cacheWrite || 0) + (u.cacheRead || 0);
+}
+
+/** Linear-interpolated quantile of a numeric array (unsorted ok). */
+function quantile(values, q) {
+  const a = values.filter((v) => typeof v === 'number' && !isNaN(v)).sort((x, y) => x - y);
+  if (!a.length) return 0;
+  const pos = (a.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return a[lo];
+  return a[lo] + (a[hi] - a[lo]) * (pos - lo);
+}
+
+function mean(values) {
+  if (!values.length) return 0;
+  return values.reduce((s, v) => s + v, 0) / values.length;
+}
+
+function sessionDurationMs(s) {
+  if (!s.firstTs || !s.lastTs) return null;
+  const a = new Date(s.firstTs).getTime();
+  const b = new Date(s.lastTs).getTime();
+  return isNaN(a) || isNaN(b) || b < a ? null : b - a;
 }
 
 function mergeUsage(a, b) {
@@ -110,11 +133,12 @@ export function buildAnalytics(sessions) {
     // is possible but unnecessary here — sessions rarely cross midnight.)
     const dk = dayKey(s.firstTs);
     if (dk) {
-      if (!byDay.has(dk)) byDay.set(dk, { day: dk, sessions: 0, messages: 0, cost: 0 });
+      if (!byDay.has(dk)) byDay.set(dk, { day: dk, sessions: 0, messages: 0, cost: 0, usage: newUsage() });
       const d = byDay.get(dk);
       d.sessions++;
       d.messages += s.messageCount;
       d.cost += s.cost;
+      mergeUsage(d.usage, s.usage);
     }
 
     // heatmap: sum each reply at its OWN weekday×hour (built in the parser),
@@ -127,6 +151,32 @@ export function buildAnalytics(sessions) {
 
   const sortByCost = (a, b) => b.cost - a.cost;
 
+  // ---- derived totals: cache efficiency, savings, per-session distribution ----
+  const cr = totals.usage.cacheRead;
+  const inp = totals.usage.input;
+  totals.cacheHitRate = cr + inp > 0 ? cr / (cr + inp) : 0;
+  // $ saved by cache reads vs paying full input rate, priced per model.
+  let cacheSavings = 0;
+  for (const m of byModel.values()) {
+    const price = priceForModel(m.model);
+    if (price) cacheSavings += (m.usage.cacheRead * price.input * (1 - CACHE_READ_MULT)) / 1_000_000;
+  }
+  totals.cacheSavings = cacheSavings;
+
+  const costs = sessions.map((s) => s.cost);
+  const msgCounts = sessions.map((s) => s.messageCount);
+  const durations = sessions.map(sessionDurationMs).filter((d) => d != null);
+  totals.interruptedSessions = sessions.filter((s) => (s.interrupted || 0) > 0).length;
+  totals.perSession = {
+    avgCost: mean(costs),
+    medianCost: quantile(costs, 0.5),
+    p90Cost: quantile(costs, 0.9),
+    avgMessages: mean(msgCounts),
+    medianMessages: quantile(msgCounts, 0.5),
+    medianDurationMs: quantile(durations, 0.5),
+    avgDurationMs: mean(durations),
+  };
+
   // Top sessions by cost
   const topSessions = [...sessions]
     .map((s) => ({
@@ -138,6 +188,8 @@ export function buildAnalytics(sessions) {
       tokens: usageTokens(s.usage),
       firstTs: s.firstTs,
       lastTs: s.lastTs,
+      durationMs: sessionDurationMs(s),
+      interrupted: s.interrupted || 0,
       models: Object.keys(s.models),
       topTools: Object.entries(s.tools).sort((a, b) => b[1] - a[1]).slice(0, 5),
       version: s.version,
@@ -152,7 +204,9 @@ export function buildAnalytics(sessions) {
     byModel: [...byModel.values()]
       .map((m) => ({ ...m, tokens: usageTokens(m.usage) }))
       .sort((a, b) => b.cost - a.cost),
-    byDay: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)),
+    byDay: [...byDay.values()]
+      .map((d) => ({ day: d.day, sessions: d.sessions, messages: d.messages, cost: d.cost, tokens: usageTokens(d.usage) }))
+      .sort((a, b) => a.day.localeCompare(b.day)),
     byTool: [...byTool.entries()].map(([tool, count]) => ({ tool, count })).sort((a, b) => b.count - a.count),
     byVersion: [...byVersion.entries()].map(([version, sessions]) => ({ version, sessions })).sort((a, b) => b.sessions - a.sessions),
     heatmap,
@@ -160,24 +214,35 @@ export function buildAnalytics(sessions) {
   };
 }
 
-/** Simple case-insensitive full-text search across message records. */
-export function search(messages, query, limit = 100) {
+/**
+ * Case-insensitive full-text search across message records.
+ * opts: { limit, role: 'user'|'assistant', project } — all optional.
+ * Returns { results, total, truncated } so the UI can show "N+ / showing M".
+ */
+export function search(messages, query, opts = {}) {
+  const limit = opts.limit && opts.limit > 0 ? opts.limit : 100;
+  const role = opts.role === 'user' || opts.role === 'assistant' ? opts.role : null;
+  const project = opts.project ? String(opts.project).toLowerCase() : null;
   const q = (query || '').trim().toLowerCase();
-  if (!q) return [];
+  if (!q) return { results: [], total: 0, truncated: false };
   const terms = q.split(/\s+/);
   const results = [];
+  let total = 0;
   for (const m of messages) {
-    const hay = m.lc; // already lowercased at parse time
-    if (terms.every((t) => hay.includes(t))) {
-      results.push({
-        sessionId: m.sessionId,
-        project: m.projectLabel,
-        ts: m.ts,
-        role: m.role,
-        snippet: m.snippet,
-      });
-      if (results.length >= limit) break;
+    if (role && m.role !== role) continue;
+    if (project && (m.projectLabel || '').toLowerCase() !== project) continue;
+    if (terms.every((t) => m.lc.includes(t))) {
+      total++;
+      if (results.length < limit) {
+        results.push({
+          sessionId: m.sessionId,
+          project: m.projectLabel,
+          ts: m.ts,
+          role: m.role,
+          snippet: m.snippet,
+        });
+      }
     }
   }
-  return results;
+  return { results, total, truncated: total > results.length };
 }
