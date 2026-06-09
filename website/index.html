@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- ===== SEO ===== -->
+    <title>Search your Claude Code history — ClaudeScope (a ccusage alternative with full-text search)</title>
+    <meta name="description" content="ClaudeScope is a free, local-first dashboard that lets you search every Claude Code session you've ever run — full-text search across every prompt, reply and tool call, plus usage analytics. npx claudescope-cli. Zero install, zero dependencies, 100% local. A ccusage alternative with search." />
+    <meta name="keywords" content="search your Claude Code history, ccusage alternative with search, Claude Code session search, claude code history viewer, claude code analytics, claude code usage dashboard, claudescope" />
+    <meta name="author" content="Joni Martin (@JoniMartin27)" />
+    <meta name="theme-color" content="#0e0f13" />
+    <link rel="canonical" href="https://jonimartin27.github.io/claudescope/" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%AD%3C/text%3E%3C/svg%3E" />
+
+    <!-- ===== Open Graph ===== -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ClaudeScope" />
+    <meta property="og:title" content="Search every Claude Code session you've ever run — ClaudeScope" />
+    <meta property="og:description" content="Full-text search across every prompt, reply and tool call in your Claude Code history — in your browser, zero install, zero dependencies, 100% local. The ccusage alternative with search." />
+    <meta property="og:url" content="https://jonimartin27.github.io/claudescope/" />
+    <meta property="og:image" content="https://jonimartin27.github.io/claudescope/promo.gif" />
+    <meta property="og:image:alt" content="ClaudeScope walkthrough — full-text search, model spend breakdown and analytics for Claude Code." />
+
+    <!-- ===== Twitter card ===== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Search every Claude Code session you've ever run — ClaudeScope" />
+    <meta name="twitter:description" content="Full-text search across every prompt, reply and tool call in your Claude Code history. npx claudescope-cli — zero install, zero deps, 100% local." />
+    <meta name="twitter:image" content="https://jonimartin27.github.io/claudescope/promo.gif" />
+
+    <style>
+      :root {
+        --bg: #0e0f13;
+        --bg-soft: #16181f;
+        --panel: #1a1d26;
+        --panel-2: #20242f;
+        --border: #2a2f3c;
+        --text: #e7e9ee;
+        --muted: #9aa3b2;
+        --faint: #8d96a6;
+        --accent: #d97757;   /* terracotta */
+        --accent-2: #36c5d0; /* cyan */
+        --accent-3: #b18cf0; /* violet */
+        --green: #4ade80;
+        --warn: #fbbf24;
+        --radius: 14px;
+        --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(1200px 600px at 12% -8%, rgba(217, 119, 87, 0.12), transparent 60%),
+          radial-gradient(1000px 500px at 100% 0%, rgba(54, 197, 208, 0.10), transparent 55%),
+          var(--bg);
+        color: var(--text);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: var(--accent-2); }
+
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+
+      /* ---------- nav ---------- */
+      nav {
+        position: sticky; top: 0; z-index: 20;
+        backdrop-filter: blur(10px);
+        background: rgba(14, 15, 19, 0.78);
+        border-bottom: 1px solid var(--border);
+      }
+      nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 14px; }
+      .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.3px; }
+      .nav-brand .logo { font-size: 24px; filter: drop-shadow(0 2px 6px rgba(217,119,87,.4)); }
+      .nav-links { display: flex; align-items: center; gap: 20px; }
+      .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; }
+      .nav-links a:hover { color: var(--text); }
+      .nav-cta {
+        background: var(--accent); color: #1a0f0a !important; border-radius: 9px;
+        padding: 8px 14px; font-weight: 600; font-size: 14px;
+      }
+      .nav-cta:hover { filter: brightness(1.08); }
+      @media (max-width: 640px) { .nav-links a.hide-sm { display: none; } }
+
+      /* ---------- hero ---------- */
+      .hero { padding: 70px 0 40px; text-align: center; }
+      .eyebrow {
+        display: inline-block; color: var(--accent-2); font-size: 13px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 1.4px;
+        border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; margin-bottom: 22px;
+        background: var(--panel);
+      }
+      .hero h1 {
+        font-size: clamp(30px, 5.4vw, 52px); line-height: 1.08; margin: 0 0 18px;
+        letter-spacing: -1.2px; font-weight: 800;
+      }
+      .hero h1 .grad {
+        background: linear-gradient(90deg, var(--accent), var(--accent-3) 60%, var(--accent-2));
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      }
+      .hero p.lede { font-size: clamp(16px, 2.4vw, 20px); color: var(--muted); max-width: 720px; margin: 0 auto 30px; }
+      .hero p.lede b { color: var(--text); font-weight: 600; }
+
+      .cmd {
+        display: inline-flex; align-items: center; gap: 12px;
+        background: #05060a; border: 1px solid var(--border); border-radius: 12px;
+        padding: 14px 18px; font: 16px/1 ui-monospace, Consolas, "SF Mono", monospace;
+        box-shadow: var(--shadow); margin-bottom: 26px; color: var(--text);
+      }
+      .cmd .dollar { color: var(--accent); }
+      .cmd .copy {
+        background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+        border-radius: 7px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+      }
+      .cmd .copy:hover { color: var(--text); border-color: var(--accent); }
+
+      .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+        border-radius: 11px; padding: 12px 22px; font-weight: 600; font-size: 15px;
+        border: 1px solid var(--border);
+      }
+      .btn.primary { background: var(--accent); color: #1a0f0a; border-color: var(--accent); }
+      .btn.primary:hover { filter: brightness(1.08); }
+      .btn.ghost { background: var(--panel); color: var(--text); }
+      .btn.ghost:hover { border-color: var(--accent); }
+      .hero .trust { color: var(--faint); font-size: 13px; margin-top: 10px; }
+
+      /* ---------- shot ---------- */
+      .shot { margin: 38px 0 10px; }
+      .shot img {
+        width: 100%; height: auto; display: block;
+        border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+      }
+      .shot figcaption { color: var(--faint); font-size: 13px; text-align: center; margin-top: 12px; }
+
+      /* ---------- sections ---------- */
+      section.block { padding: 56px 0; border-top: 1px solid var(--border); }
+      .section-head { text-align: center; margin-bottom: 40px; }
+      .section-head h2 { font-size: clamp(24px, 3.6vw, 34px); margin: 0 0 10px; letter-spacing: -.6px; }
+      .section-head p { color: var(--muted); max-width: 640px; margin: 0 auto; }
+
+      /* ---------- feature grid ---------- */
+      .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      @media (max-width: 860px) { .features { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 540px) { .features { grid-template-columns: 1fr; } }
+      .feature {
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 22px 20px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+      }
+      .feature::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent); opacity: .85; }
+      .feature.f2::before { background: var(--accent-2); }
+      .feature.f3::before { background: var(--accent-3); }
+      .feature.f4::before { background: var(--green); }
+      .feature.f5::before { background: var(--warn); }
+      .feature .ico { font-size: 26px; margin-bottom: 12px; display: block; }
+      .feature h3 { margin: 0 0 7px; font-size: 17px; }
+      .feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+      /* ---------- comparison table ---------- */
+      .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+      table.cmp { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 14.5px; }
+      table.cmp th, table.cmp td { padding: 13px 14px; text-align: center; border-bottom: 1px solid var(--border); }
+      table.cmp thead th { background: var(--panel-2); font-weight: 700; position: sticky; top: 0; }
+      table.cmp tbody th {
+        text-align: left; font-weight: 500; color: var(--text); background: var(--bg-soft);
+        white-space: nowrap;
+      }
+      table.cmp .us { background: rgba(217, 119, 87, 0.10); }
+      table.cmp thead .us { background: linear-gradient(180deg, rgba(217,119,87,.22), var(--panel-2)); color: var(--text); }
+      table.cmp tbody tr:hover td, table.cmp tbody tr:hover th { background: var(--panel); }
+      table.cmp tbody tr:hover .us { background: rgba(217, 119, 87, 0.16); }
+      .yes { color: var(--green); font-weight: 700; }
+      .no { color: var(--accent); font-weight: 700; }
+      .partial { color: var(--warn); font-weight: 700; }
+      table.cmp td small, table.cmp th small { display: block; color: var(--faint); font-size: 11.5px; font-weight: 400; margin-top: 2px; }
+      .cmp-note { color: var(--faint); font-size: 12.5px; margin-top: 14px; text-align: center; }
+
+      /* ---------- privacy ---------- */
+      .privacy {
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        border: 1px solid var(--border); border-radius: 18px; padding: 38px 32px; box-shadow: var(--shadow);
+      }
+      .privacy h2 { font-size: clamp(22px, 3.4vw, 30px); margin: 0 0 14px; letter-spacing: -.5px; }
+      .privacy h2 .lock { color: var(--green); }
+      .privacy > p { color: var(--muted); max-width: 680px; }
+      .privacy ul { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      @media (max-width: 620px) { .privacy ul { grid-template-columns: 1fr; } }
+      .privacy li { display: flex; gap: 11px; align-items: flex-start; color: var(--text); font-size: 14.5px; }
+      .privacy li .ck { color: var(--green); font-weight: 800; flex-shrink: 0; }
+      .privacy li small { display: block; color: var(--faint); font-size: 12.5px; margin-top: 2px; }
+      .audit { margin-top: 24px; }
+      .audit code {
+        background: #05060a; border: 1px solid var(--border); border-radius: 8px;
+        padding: 2px 8px; color: var(--accent-2); font-family: ui-monospace, Consolas, monospace; font-size: 13.5px;
+      }
+
+      /* ---------- final cta ---------- */
+      .final { text-align: center; }
+      .final h2 { font-size: clamp(24px, 4vw, 36px); margin: 0 0 16px; letter-spacing: -.7px; }
+      .final p { color: var(--muted); margin: 0 auto 26px; max-width: 560px; }
+
+      /* ---------- footer ---------- */
+      footer { border-top: 1px solid var(--border); padding: 34px 0; color: var(--faint); font-size: 13.5px; }
+      footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+      footer a { color: var(--muted); text-decoration: none; margin-left: 18px; }
+      footer a:first-child { margin-left: 0; }
+      footer a:hover { color: var(--text); }
+      footer .foot-links { display: flex; flex-wrap: wrap; }
+
+      :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: .001ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="wrap">
+        <a class="nav-brand" href="#top" style="text-decoration:none;color:inherit;">
+          <span class="logo">🔭</span> ClaudeScope
+        </a>
+        <div class="nav-links">
+          <a href="#features" class="hide-sm">Features</a>
+          <a href="#compare" class="hide-sm">Compare</a>
+          <a href="#privacy" class="hide-sm">Privacy</a>
+          <a class="nav-cta" href="https://github.com/JoniMartin27/claudescope" target="_blank" rel="noopener">GitHub ★</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero wrap" id="top">
+      <span class="eyebrow">🔭 ccusage alternative — with search</span>
+      <h1>Search <span class="grad">every Claude Code session</span><br />you've ever run.</h1>
+      <p class="lede">
+        ccusage tells you what you <i>spent</i>. ClaudeScope lets you <b>search what you actually did</b> —
+        full-text search across every prompt, reply and tool call, in your browser, with
+        <b>zero install and zero network</b>. Plus the usage dashboard your subscription doesn't show you.
+      </p>
+
+      <div class="cmd">
+        <span><span class="dollar">$</span> npx claudescope-cli</span>
+        <button class="copy" id="copyBtn" type="button" aria-label="Copy install command">Copy</button>
+      </div>
+
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/JoniMartin27/claudescope" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="btn ghost" href="https://www.npmjs.com/package/claudescope-cli" target="_blank" rel="noopener">📦 View on npm</a>
+      </div>
+      <p class="trust">No install · no config · no account · no network · zero dependencies · MIT</p>
+
+      <figure class="shot">
+        <img src="promo.gif" alt="ClaudeScope walkthrough — type an error message, jump to the session where you solved it, then explore usage stat cards, model-spend breakdown and an activity heatmap." width="1080" height="608" loading="eager" />
+        <figcaption>Type an error you remember solving → land in the 3-week-old session. Plus stats, model spend and a heatmap — all from transcripts already on your disk.</figcaption>
+      </figure>
+    </header>
+
+    <main>
+      <!-- ===== FEATURES ===== -->
+      <section class="block" id="features">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>What you get</h2>
+            <p>One command opens a browser dashboard built entirely from the JSONL transcripts Claude Code already writes to <code>~/.claude/projects</code>.</p>
+          </div>
+          <div class="features">
+            <div class="feature f1">
+              <span class="ico">🔎</span>
+              <h3>Full-text search</h3>
+              <p>Grep every prompt, reply and tool call you've ever sent — across all projects at once. Filters for project, model, date and role, plus a regex toggle. The thing ccusage and tokscale structurally can't do.</p>
+            </div>
+            <div class="feature f2">
+              <span class="ico">🎬</span>
+              <h3>Session replay</h3>
+              <p>Every search result lands somewhere. Open a threaded replay of any session — prompts, replies, tool calls and per-message tokens. Navigate your own history instead of just grepping it.</p>
+            </div>
+            <div class="feature f3">
+              <span class="ico">⭐</span>
+              <h3>Wrapped share card</h3>
+              <p>A 1200×630 “ClaudeScope Wrapped” card with your top numbers and a derived archetype — rendered 100% locally. Flex your stats without surrendering a single byte.</p>
+            </div>
+            <div class="feature f4">
+              <span class="ico">📈</span>
+              <h3>Usage analytics</h3>
+              <p>Token mix, per-model and per-project spend, an activity heatmap, busiest weekday×hour, range diffs and CSV/JSON export. The dashboard ccusage's terminal output won't give you.</p>
+            </div>
+            <div class="feature f5">
+              <span class="ico">📱</span>
+              <h3>Installable PWA</h3>
+              <p>The dashboard is an offline-capable Progressive Web App — install it, and it keeps working with your Wi-Fi off. Still pure same-origin; it never caches your data to the network.</p>
+            </div>
+            <div class="feature f1">
+              <span class="ico">🔒</span>
+              <h3>100% local</h3>
+              <p>Pure Node standard library — zero runtime dependencies, zero build step, zero network calls at startup. Auditable in five minutes. Nothing ever leaves your machine.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== COMPARISON ===== -->
+      <section class="block" id="compare">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>How it compares</h2>
+            <p>The Claude Code analytics niche is crowded. Here's an honest map of where each tool actually wins — search, the web dashboard, and the zero-friction, no-upload combination is the gap ClaudeScope fills.</p>
+          </div>
+          <div class="table-scroll">
+            <table class="cmp">
+              <thead>
+                <tr>
+                  <th scope="col" style="text-align:left;">Capability</th>
+                  <th scope="col" class="us">ClaudeScope<small>npx claudescope-cli</small></th>
+                  <th scope="col">ccusage<small>terminal cost king</small></th>
+                  <th scope="col">CCHV<small>history viewer</small></th>
+                  <th scope="col">Sniffly<small>Python dashboard</small></th>
+                  <th scope="col">tokscale<small>Rust + leaderboard</small></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Full-text content search</th>
+                  <td class="us"><span class="yes">✔</span></td>
+                  <td><span class="no">✘</span></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="partial">~</span><small>browse</small></td>
+                  <td><span class="no">✘</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Browser dashboard</th>
+                  <td class="us"><span class="yes">✔</span></td>
+                  <td><span class="no">✘</span><small>terminal only</small></td>
+                  <td><span class="yes">✔</span><small>desktop / server</small></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="no">✘</span><small>CLI</small></td>
+                </tr>
+                <tr>
+                  <th scope="row">Session replay</th>
+                  <td class="us"><span class="yes">✔</span></td>
+                  <td><span class="no">✘</span></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="partial">~</span></td>
+                  <td><span class="no">✘</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Zero-install (npx)</th>
+                  <td class="us"><span class="yes">✔</span></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="no">✘</span><small>download / brew / Docker</small></td>
+                  <td><span class="no">✘</span><small>Python env</small></td>
+                  <td><span class="yes">✔</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Zero dependencies</th>
+                  <td class="us"><span class="yes">✔</span><small>Node stdlib only</small></td>
+                  <td><span class="partial">~</span></td>
+                  <td><span class="no">✘</span><small>Rust + Tauri</small></td>
+                  <td><span class="no">✘</span><small>Python deps</small></td>
+                  <td><span class="no">✘</span><small>Rust toolchain</small></td>
+                </tr>
+                <tr>
+                  <th scope="row">100% local / no upload</th>
+                  <td class="us"><span class="yes">✔</span></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="yes">✔</span></td>
+                  <td><span class="partial">~</span><small>share uploads</small></td>
+                  <td><span class="partial">~</span><small>optional submit</small></td>
+                </tr>
+                <tr>
+                  <th scope="row">Shareable Wrapped card</th>
+                  <td class="us"><span class="yes">✔</span><small>generated offline</small></td>
+                  <td><span class="no">✘</span></td>
+                  <td><span class="no">✘</span></td>
+                  <td><span class="no">✘</span></td>
+                  <td><span class="yes">✔</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Price</th>
+                  <td class="us"><span class="yes">Free · MIT</span></td>
+                  <td><span class="yes">Free · MIT</span></td>
+                  <td><span class="yes">Free · OSS</span></td>
+                  <td><span class="yes">Free · OSS</span></td>
+                  <td><span class="yes">Free · OSS</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="cmp-note">
+            ✔ yes · ~ partial · ✘ no. <b>ccusage</b> is the de-facto cost/usage standard (daily/session reports, 5-hour billing windows, JSON export, 15+ agent CLIs) — but it's terminal-only with no content search. <b>CCHV</b> (claude-code-history-viewer) offers offline search + analytics, but ships as a heavy desktop app (download / brew / Docker / Rust). <b>Sniffly</b> is a Python browser dashboard with error analysis. <b>tokscale</b> brings the viral leaderboard + Wrapped card — but its <code>submit</code> uploads your data to a server. Treat star counts as stale-prone; the ranking is what's stable. Facts cross-checked against each project's docs, June 2026.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== PRIVACY ===== -->
+      <section class="block" id="privacy">
+        <div class="wrap">
+          <div class="privacy">
+            <h2><span class="lock">🔒</span> 100% local. Zero network. Auditable.</h2>
+            <p>
+              Your AI history is sensitive. ClaudeScope is built so it never has to leave your machine —
+              and so you can prove that to yourself in five minutes. There's no account, no telemetry,
+              and no server leaderboard. Disconnect your Wi-Fi and everything still works.
+            </p>
+            <ul>
+              <li>
+                <span class="ck">✔</span>
+                <span><b>No network at startup</b><small>The dashboard makes zero outbound requests when it opens. Reads only the JSONL files already on your disk.</small></span>
+              </li>
+              <li>
+                <span class="ck">✔</span>
+                <span><b>No account, no upload</b><small>Nothing is submitted anywhere. Even the Wrapped share card is rendered locally in your browser.</small></span>
+              </li>
+              <li>
+                <span class="ck">✔</span>
+                <span><b>Anonymized share card</b><small>No project names, no paths, no prompts — only aggregate numbers, rendered locally in your browser.</small></span>
+              </li>
+              <li>
+                <span class="ck">✔</span>
+                <span><b>Zero dependencies</b><small>Pure Node standard library and vanilla browser JS. Nothing to vet in a supply chain. Read the whole thing.</small></span>
+              </li>
+            </ul>
+            <p class="audit">
+              Don't take our word for it — audit it: <code>git clone</code> the repo, read every line,
+              then run it with your network off. It's a few hundred lines of stdlib Node and one HTML page.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== FINAL CTA ===== -->
+      <section class="block final">
+        <div class="wrap">
+          <h2>Find the session you know you already solved.</h2>
+          <p>One command. No install, no config, no account, no network. Your browser opens a dashboard built from the transcripts already on your disk.</p>
+          <div class="cmd" style="margin-bottom:24px;">
+            <span><span class="dollar">$</span> npx claudescope-cli</span>
+            <button class="copy" id="copyBtn2" type="button" aria-label="Copy install command">Copy</button>
+          </div>
+          <div class="ctas">
+            <a class="btn primary" href="https://github.com/JoniMartin27/claudescope" target="_blank" rel="noopener">★ Star on GitHub</a>
+            <a class="btn ghost" href="https://www.npmjs.com/package/claudescope-cli" target="_blank" rel="noopener">📦 View on npm</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div>🔭 ClaudeScope — © 2026 Joni Martin · MIT License</div>
+        <div class="foot-links">
+          <a href="https://github.com/JoniMartin27/claudescope" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://www.npmjs.com/package/claudescope-cli" target="_blank" rel="noopener">npm</a>
+          <a href="https://github.com/JoniMartin27/claudescope/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://github.com/JoniMartin27/claudescope/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Tiny, dependency-free clipboard helper for the install command. No network,
+      // no analytics — purely a UX nicety on a static page.
+      function wireCopy(id) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var cmd = 'npx claudescope-cli';
+          var done = function () {
+            var prev = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.textContent = prev; }, 1400);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cmd).then(done).catch(done);
+          } else {
+            done();
+          }
+        });
+      }
+      wireCopy('copyBtn');
+      wireCopy('copyBtn2');
+    </script>
+  </body>
+</html>

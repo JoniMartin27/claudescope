@@ -6,7 +6,7 @@
 //
 // Everything is local and read-only; nothing touches the network.
 import { findClaudeDir } from './paths.js';
-import { parseAll, readConversation } from './parser.js';
+import { parseAll, parseAllSources, readConversation } from './parser.js';
 import { buildAnalytics, search } from './analytics.js';
 import { costForUsage, priceForModel } from './pricing.js';
 
@@ -18,8 +18,10 @@ import { costForUsage, priceForModel } from './pricing.js';
 export async function analyze(claudeDir) {
   const dir = claudeDir || findClaudeDir();
   if (!dir) throw new Error('Could not find a Claude Code data directory (set CLAUDE_CONFIG_DIR or pass a path).');
-  const { sessions, messages } = await parseAll(dir);
-  return { claudeDir: dir, analytics: buildAnalytics(sessions), sessions, messages };
+  // Multi-CLI: Claude Code plus any other agent CLI whose local logs are
+  // present. Each session/message is tagged with its `source`.
+  const { sessions, messages, sources } = await parseAllSources(dir);
+  return { claudeDir: dir, analytics: buildAnalytics(sessions), sessions, messages, sources };
 }
 
-export { findClaudeDir, parseAll, readConversation, buildAnalytics, search, costForUsage, priceForModel };
+export { findClaudeDir, parseAll, parseAllSources, readConversation, buildAnalytics, search, costForUsage, priceForModel };

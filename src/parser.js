@@ -83,6 +83,7 @@ export async function parseFile(filePath, encodedProject) {
         file: path.basename(filePath),
         firstTs: null,
         lastTs: null,
+        source: 'claude-code',
         version: null,
         gitBranch: null,
         cwd: null,
@@ -203,6 +204,7 @@ export async function parseFile(filePath, encodedProject) {
       const lc = (text.length > SEARCH_MAX ? text.slice(0, SEARCH_MAX) : text).toLowerCase();
       messages.push({
         sessionId: sid,
+        source: 'claude-code',
         project: encodedProject,
         projectLabel: s.projectLabel,
         ts,
@@ -273,7 +275,22 @@ export async function readConversation(filePath, sessionId) {
   return { sessionId, turns, ...header };
 }
 
-/** Parse every transcript under <claudeDir>/projects. */
+/**
+ * Multi-CLI aggregate scan: Claude Code PLUS any other agent CLI whose local
+ * logs are present (Codex, Cursor, Aider, Gemini, Copilot). Returns the same
+ * { sessions, messages } shape as parseAll, with every record tagged `source`,
+ * plus a `sources` summary of which adapters contributed. This is what the
+ * dashboard/server use; parseAll() below stays Claude-Code-only so the original
+ * library API and behavior are unchanged.
+ */
+export async function parseAllSources(claudeDir, opts = {}) {
+  // Imported lazily to keep parser.js free of a hard dependency cycle (the
+  // claude-code adapter imports parseFile from here).
+  const { parseAllSources: run } = await import('./sources/index.js');
+  return run(claudeDir, opts);
+}
+
+/** Parse every Claude Code transcript under <claudeDir>/projects (claude-only). */
 export async function parseAll(claudeDir, { onProgress } = {}) {
   const root = projectsDir(claudeDir);
   const sessions = [];

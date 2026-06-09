@@ -1,0 +1,33 @@
+{
+  "name": "claudescope",
+  "owner": {
+    "name": "Joni Martin",
+    "url": "https://github.com/JoniMartin27"
+  },
+  "metadata": {
+    "description": "ClaudeScope — a 100% local, zero-dependency dashboard with full-text search and analytics for your Claude Code sessions.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "claudescope",
+      "source": "./plugin",
+      "description": "Launch ClaudeScope, a 100% local dashboard with full-text search and analytics for your Claude Code sessions (tokens, cost, cache savings, archetype). Adds /claudescope and /claudescope:wrapped.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Joni Martin",
+        "url": "https://github.com/JoniMartin27"
+      },
+      "homepage": "https://github.com/JoniMartin27/claudescope",
+      "keywords": [
+        "claude-code",
+        "analytics",
+        "dashboard",
+        "search",
+        "local-first",
+        "privacy",
+        "wrapped"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "claudescope",
+  "description": "Launch ClaudeScope, a 100% local dashboard with full-text search and analytics for your Claude Code sessions (tokens, cost, cache savings, archetype).",
+  "version": "0.1.0",
+  "author": {
+    "name": "Joni Martin",
+    "url": "https://github.com/JoniMartin27"
+  },
+  "homepage": "https://github.com/JoniMartin27/claudescope",
+  "keywords": [
+    "claude-code",
+    "analytics",
+    "dashboard",
+    "search",
+    "usage",
+    "tokens",
+    "cost",
+    "local-first",
+    "privacy",
+    "wrapped"
+  ]
+}
