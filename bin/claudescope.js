@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process';
 import { findClaudeDir } from '../src/paths.js';
 import { createServer } from '../src/server.js';
-import { parseAll } from '../src/parser.js';
+import { parseAllSources } from '../src/parser.js';
 import { buildAnalytics } from '../src/analytics.js';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -121,7 +121,7 @@ async function main() {
   }
 
   if (has('--json')) {
-    const { sessions } = await parseAll(claudeDir);
+    const { sessions } = await parseAllSources(claudeDir);
     const json = JSON.stringify(buildAnalytics(sessions), null, 2);
     const outFile = opt('--output', null) || opt('-o', null);
     if (outFile) {

@@ -141,6 +141,22 @@ function renderArchetype(a) {
     `<span class="arc-text"><b>${escapeHtml(arc.name || '')}</b><small>${escapeHtml(arc.blurb || '')}</small></span>`;
 }
 
+function renderPercentile(a) {
+  const badge = $('#percentileBadge');
+  if (!badge) return;
+  const p = a.totals && a.totals.percentile;
+  if (!p || !p.label || !(a.totals.tokens > 0)) {
+    badge.hidden = true;
+    return;
+  }
+  badge.hidden = false;
+  // p.label is generated server-side ("top X%") but escape defensively.
+  badge.innerHTML =
+    `<span class="pct-emoji" aria-hidden="true">🔭</span>` +
+    `<span class="pct-text"><b>~${escapeHtml(p.label)} (est.)</b><small>token users · rough offline estimate</small></span>`;
+  badge.title = 'Heuristic offline estimate (no real population data) based on ~' + fmt.num(Math.round(p.monthlyTokens)) + ' tokens/mo';
+}
+
 // ---------- momentum + streak ----------
 function deltaBadge(pct) {
   if (pct == null) return '<span class="delta flat">— no baseline</span>';
@@ -440,7 +456,8 @@ function setupSearch() {
 }
 async function runSearch(q) {
   $('#searchHint').textContent = 'searching…';
-  const url = '/api/search?q=' + encodeURIComponent(q) + '&limit=40' + (regexMode ? '&regex=1' : '');
+  const srcParam = STATE.source ? '&source=' + encodeURIComponent(STATE.source) : '';
+  const url = '/api/search?q=' + encodeURIComponent(q) + '&limit=40' + (regexMode ? '&regex=1' : '') + srcParam;
   const res = await fetch(url).then((r) => r.json());
   const c = $('#searchResults');
   if (res.error === 'bad regex') {
@@ -462,7 +479,13 @@ async function runSearch(q) {
     row.setAttribute('role', 'button');
     row.dataset.id = r.sessionId;
     const role = r.role === 'assistant' ? 'assistant' : 'user';
-    row.appendChild(el('div', 'r-head', `<span class="tag ${role}">${role}</span><span class="r-proj">${escapeHtml(r.project)}</span><span class="r-proj">${fmt.date(r.ts)}</span><span class="r-open">open ↗</span>`));
+    // Show which CLI a hit came from, but only when more than one is present.
+    let srcTag = '';
+    if ((STATE.sources || []).length > 1 && r.source) {
+      const m = sourceMeta(r.source);
+      srcTag = `<span class="r-src" style="border-color:${m.color}">${escapeHtml(m.label)}</span>`;
+    }
+    row.appendChild(el('div', 'r-head', `<span class="tag ${role}">${role}</span>${srcTag}<span class="r-proj">${escapeHtml(r.project)}</span><span class="r-proj">${fmt.date(r.ts)}</span><span class="r-open">open ↗</span>`));
     row.appendChild(el('div', 'r-text', highlight(escapeHtml(r.snippet), q)));
     const open = () => openSession(r.sessionId, r.snippet.slice(0, 60));
     row.addEventListener('click', open);
@@ -513,6 +536,11 @@ async function openSession(id, label) {
   focusModal(modal);
   try {
     const c = await fetch('/api/session?id=' + encodeURIComponent(id)).then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))));
+    // Non-Claude sources don't (yet) support the full transcript re-read.
+    if (c.note && (!c.turns || !c.turns.length)) {
+      body.innerHTML = `<div class="modal-loading">${escapeHtml(c.note)}</div>`;
+      return;
+    }
     const CAP = 600;
     const total = c.turns.length;
     const turns = total > CAP ? c.turns.slice(-CAP) : c.turns;
@@ -674,6 +702,7 @@ function shareStats(a) {
     topTools: (a.byTool || []).slice(0, 4).map((x) => x.tool),
     busiest: best > 0 ? `${DAYFULL[bd]} · ${fmtHour(bh)}` : null,
     archetype: a.archetype || null,
+    percentile: t.percentile || null,
   };
 }
 function drawShareCard(a) {
@@ -756,6 +785,11 @@ function drawShareCard(a) {
   }
   if (s.topTools.length) {
     ctx.fillText(`🛠 Top tools: ${s.topTools.join(', ')}`, 64, by);
+    by += 42;
+  }
+  if (s.percentile && s.percentile.label) {
+    ctx.fillStyle = '#d97757';
+    ctx.fillText(`🔭 Est. ${s.percentile.label} of token users (rough heuristic)`, 64, by);
   }
 
   // Footer watermark.
@@ -770,9 +804,11 @@ function shareCaption(a) {
   const s = shareStats(a);
   const arc = s.archetype ? `${s.archetype.emoji || ''} ${s.archetype.name || ''} — ` : '';
   const money = s.cost > 0 ? `~${fmt.money(s.cost)} in est. API value` : `${fmt.money(s.cacheSavings)} saved by cache`;
+  const pct = s.percentile && s.percentile.label ? `🔭 Est. ${s.percentile.label} of token users (rough offline heuristic, not measured).\n` : '';
   return (
     `${arc}my Claude Code, wrapped:\n` +
     `${fmt.int(s.sessions)} sessions · ${fmt.num(s.tokens)} tokens · ${money}.\n` +
+    pct +
     `See yours locally → npx claudescope-cli  🔭`
   );
 }
@@ -842,13 +878,67 @@ function renderSkeleton() {
   }
 }
 
+// ---------- source filter (multi-CLI) ----------
+// Only shown when MORE THAN ONE agent CLI is detected. With just Claude Code
+// present the bar stays hidden and the UI is identical to before.
+const SOURCE_META = {
+  'claude-code': { label: 'Claude Code', emoji: '🔭', color: '#d97757' },
+  codex: { label: 'OpenAI Codex', emoji: '🟢', color: '#10a37f' },
+  cursor: { label: 'Cursor', emoji: '▮', color: '#9aa3b2' },
+  aider: { label: 'Aider', emoji: '🟣', color: '#b18cf0' },
+  gemini: { label: 'Gemini CLI', emoji: '✦', color: '#4f8cff' },
+  copilot: { label: 'GitHub Copilot', emoji: '🐙', color: '#36c5d0' },
+};
+function sourceMeta(id) {
+  return SOURCE_META[id] || { label: id, emoji: '•', color: '#8d96a6' };
+}
+function renderSourceBar(sources) {
+  const bar = $('#sourceBar');
+  if (!bar) return;
+  const list = Array.isArray(sources) ? sources : [];
+  // Single source (or none) → keep the dashboard exactly as it was.
+  if (list.length <= 1) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+  bar.hidden = false;
+  STATE.sources = list;
+  const chips = [{ id: null, sessions: list.reduce((n, s) => n + (s.sessions || 0), 0) }, ...list];
+  bar.innerHTML = chips
+    .map((s) => {
+      const active = (STATE.source || null) === (s.id || null);
+      if (!s.id) {
+        return `<button type="button" class="src-chip${active ? ' active' : ''}" data-source="">All sources <small>${fmt.int(s.sessions)}</small></button>`;
+      }
+      const m = sourceMeta(s.id);
+      return `<button type="button" class="src-chip${active ? ' active' : ''}" data-source="${escapeHtml(s.id)}">` +
+        `<span class="src-dot" style="background:${m.color}"></span>${escapeHtml(m.label)} <small>${fmt.int(s.sessions)}</small></button>`;
+    })
+    .join('');
+}
+function setupSourceBar() {
+  const bar = $('#sourceBar');
+  if (!bar) return;
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-source]');
+    if (!b) return;
+    const next = b.dataset.source || null;
+    if ((STATE.source || null) === next) return;
+    STATE.source = next;
+    renderSourceBar(STATE.sources);
+    loadRange(STATE.range);
+  });
+}
+
 // ---------- controller ----------
-const STATE = { range: 'all', analytics: null };
+const STATE = { range: 'all', analytics: null, source: null, sources: [] };
 
 function renderAll(a) {
   STATE.analytics = a;
   renderInsights(a);
   renderArchetype(a);
+  renderPercentile(a);
   renderCards(a);
   renderTypical(a);
   renderTokenMix(a);
@@ -863,7 +953,8 @@ function renderAll(a) {
 async function loadRange(range) {
   STATE.range = range;
   document.querySelectorAll('#rangeBar button').forEach((b) => b.classList.toggle('active', b.dataset.range === range));
-  const a = await fetch('/api/analytics?range=' + encodeURIComponent(range)).then((r) => r.json());
+  const srcParam = STATE.source ? '&source=' + encodeURIComponent(STATE.source) : '';
+  const a = await fetch('/api/analytics?range=' + encodeURIComponent(range) + srcParam).then((r) => r.json());
   if (!a.totals || a.totals.sessions === 0) {
     if (range === 'all') return renderEmptyState();
     // empty range — show zeros but keep the bar usable
@@ -923,9 +1014,11 @@ async function boot() {
     return renderEmptyState();
   }
   renderMeta(a, meta);
+  renderSourceBar(meta.sources);
   renderAll(a);
   setupSearch();
   setupControls();
+  setupSourceBar();
   setupModal();
   setupSettings();
   setupShare();

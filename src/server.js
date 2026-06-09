@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseAll, readConversation } from './parser.js';
+import { parseAllSources, readConversation } from './parser.js';
 import { buildAnalytics, search } from './analytics.js';
 import { projectsDir } from './paths.js';
 import { recordSnapshot, readSnapshots, computeStreak } from './snapshots.js';
@@ -69,8 +69,9 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
   const bindHost = host || '127.0.0.1';
   log('Scanning transcripts…');
   const t0 = Date.now();
-  const { sessions, messages } = await parseAll(claudeDir);
-  log(`Parsed ${sessions.length} sessions, ${messages.length} messages in ${Date.now() - t0}ms`);
+  const { sessions, messages, sources } = await parseAllSources(claudeDir);
+  const srcNote = sources && sources.length > 1 ? ` across ${sources.length} CLIs (${sources.map((s) => s.id).join(', ')})` : '';
+  log(`Parsed ${sessions.length} sessions, ${messages.length} messages${srcNote} in ${Date.now() - t0}ms`);
 
   // Window helpers for the momentum/diff endpoints: filter sessions to the
   // last N local days (offset N days back so we can compare against the
@@ -94,25 +95,31 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
   // Map sessionId -> transcript file so the detail view can re-read on demand.
   const sessionIndex = new Map();
   for (const s of sessions) {
-    if (!sessionIndex.has(s.sessionId)) sessionIndex.set(s.sessionId, { project: s.project, file: s.file });
+    if (!sessionIndex.has(s.sessionId)) sessionIndex.set(s.sessionId, { project: s.project, file: s.file, source: s.source || 'claude-code' });
   }
 
   // Cache the serialized analytics payload per range (cheap rebuild, but the
   // "all" view is requested on every load — serialize once, reuse + ETag).
-  const cache = new Map(); // range -> { json, etag }
-  function analyticsFor(range) {
+  const cache = new Map(); // cacheKey -> { json, etag }
+  // Set of source ids actually present, so a source filter can be validated.
+  const presentSources = new Set((sources || []).map((s) => s.id));
+  function analyticsFor(range, source) {
     const key = RANGES[range] ? range : 'all';
-    if (cache.has(key)) return cache.get(key);
+    // Only honor a source filter for a source we actually have; ignore otherwise.
+    const src = source && presentSources.has(source) ? source : null;
+    const cacheKey = src ? `${key}|${src}` : key;
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
     let subset = sessions;
     if (RANGES[key]) {
       const since = Date.now() - RANGES[key] * 86400000;
-      subset = sessions.filter((s) => s.lastTs && new Date(s.lastTs).getTime() >= since);
+      subset = subset.filter((s) => s.lastTs && new Date(s.lastTs).getTime() >= since);
     }
-    const payload = { ...buildAnalytics(subset), range: key };
+    if (src) subset = subset.filter((s) => (s.source || 'claude-code') === src);
+    const payload = { ...buildAnalytics(subset), range: key, source: src };
     const json = JSON.stringify(payload);
     const etag = '"' + crypto.createHash('sha1').update(json).digest('hex').slice(0, 16) + '"';
     const entry = { json, etag };
-    cache.set(key, entry);
+    cache.set(cacheKey, entry);
     return entry;
   }
 
@@ -128,7 +135,7 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
     }
 
     if (pathname === '/api/analytics') {
-      const { json, etag } = analyticsFor(params.get('range') || 'all');
+      const { json, etag } = analyticsFor(params.get('range') || 'all', params.get('source') || undefined);
       if (req.headers['if-none-match'] === etag) {
         res.writeHead(304, { ETag: etag });
         return res.end();
@@ -142,6 +149,7 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
         limit: parseInt(params.get('limit') || '100', 10),
         role: params.get('role') || undefined,
         project: params.get('project') || undefined,
+        source: params.get('source') || undefined,
         regex: params.get('regex') === '1',
       });
       return sendJson(res, 200, out);
@@ -151,6 +159,12 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
       const id = params.get('id');
       const ref = id && sessionIndex.get(id);
       if (!ref) return sendJson(res, 404, { error: 'session not found' });
+      // The on-demand transcript re-reader is Claude-Code-specific (it knows the
+      // projects/<encoded>/<file>.jsonl layout). Other CLIs' detail view is not
+      // re-readable this way yet — return a friendly note instead of 500ing.
+      if ((ref.source || 'claude-code') !== 'claude-code') {
+        return sendJson(res, 200, { sessionId: id, source: ref.source, turns: [], note: 'Full transcript view is available for Claude Code sessions. Search and analytics cover all sources.' });
+      }
       const filePath = path.join(projectsDir(claudeDir), ref.project, ref.file);
       try {
         const convo = await readConversation(filePath, id);
@@ -161,7 +175,7 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
     }
 
     if (pathname === '/api/meta') {
-      return sendJson(res, 200, { claudeDir, sessions: sessions.length, messages: messages.length });
+      return sendJson(res, 200, { claudeDir, sessions: sessions.length, messages: messages.length, sources: sources || [] });
     }
 
     if (pathname === '/api/insights') {

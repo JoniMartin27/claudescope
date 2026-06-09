@@ -1,6 +1,7 @@
 import { priceForModel, CACHE_READ_MULT } from './pricing.js';
 import { classifyArchetype } from './archetype.js';
 import { buildInsights } from './insights.js';
+import { topPercent } from './percentile.js';
 
 function usageTokens(u) {
   return (u.input || 0) + (u.output || 0) + (u.cacheWrite || 0) + (u.cacheRead || 0);
@@ -69,6 +70,7 @@ export function buildAnalytics(sessions) {
   };
 
   const byProject = new Map();
+  const bySource = new Map();
   const byModel = new Map();
   const byDay = new Map();
   const byTool = new Map();
@@ -105,6 +107,18 @@ export function buildAnalytics(sessions) {
     p.messages += s.messageCount;
     p.cost += s.cost;
     mergeUsage(p.usage, s.usage);
+
+    // by source (which agent CLI the session came from). Defaults to
+    // claude-code so legacy parses with no source tag still bucket correctly.
+    const src = s.source || 'claude-code';
+    if (!bySource.has(src)) {
+      bySource.set(src, { source: src, sessions: 0, messages: 0, cost: 0, usage: newUsage() });
+    }
+    const sc = bySource.get(src);
+    sc.sessions++;
+    sc.messages += s.messageCount;
+    sc.cost += s.cost;
+    mergeUsage(sc.usage, s.usage);
 
     // by model (messages + sessions + per-model tokens & cost)
     for (const [model, count] of Object.entries(s.models)) {
@@ -203,6 +217,9 @@ export function buildAnalytics(sessions) {
     generatedAt: new Date().toISOString(),
     totals: { ...totals, tokens: usageTokens(totals.usage) },
     byProject: [...byProject.values()].map((p) => ({ ...p, tokens: usageTokens(p.usage) })).sort(sortByCost),
+    bySource: [...bySource.values()]
+      .map((sc) => ({ source: sc.source, sessions: sc.sessions, messages: sc.messages, cost: sc.cost, tokens: usageTokens(sc.usage) }))
+      .sort((a, b) => b.sessions - a.sessions),
     byModel: [...byModel.values()]
       .map((m) => ({ ...m, tokens: usageTokens(m.usage) }))
       .sort((a, b) => b.cost - a.cost),
@@ -214,6 +231,9 @@ export function buildAnalytics(sessions) {
     heatmap,
     sessions: topSessions,
   };
+
+  // Offline percentile badge — needs the shaped totals (tokens + first/lastTs).
+  result.totals.percentile = topPercent(result);
 
   // Derived, purely-local extras computed from the shaped payload above.
   result.archetype = classifyArchetype(result);
@@ -237,6 +257,7 @@ export function search(messages, query, opts = {}) {
   const limit = opts.limit && opts.limit > 0 ? opts.limit : 100;
   const role = opts.role === 'user' || opts.role === 'assistant' ? opts.role : null;
   const project = opts.project ? String(opts.project).toLowerCase() : null;
+  const source = opts.source ? String(opts.source).toLowerCase() : null;
   const raw = (query || '').trim();
   if (!raw) return { results: [], total: 0, truncated: false };
   const q = raw.toLowerCase();
@@ -261,11 +282,13 @@ export function search(messages, query, opts = {}) {
   for (const m of messages) {
     if (role && m.role !== role) continue;
     if (project && (m.projectLabel || '').toLowerCase() !== project) continue;
+    if (source && (m.source || 'claude-code').toLowerCase() !== source) continue;
     if (matches(m.lc)) {
       total++;
       if (results.length < limit) {
         results.push({
           sessionId: m.sessionId,
+          source: m.source || 'claude-code',
           project: m.projectLabel,
           ts: m.ts,
           role: m.role,

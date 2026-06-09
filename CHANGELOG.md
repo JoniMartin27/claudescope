@@ -3,6 +3,27 @@
 All notable changes to ClaudeScope are documented here. This project follows
 [Semantic Versioning](https://semver.org).
 
+## 0.4.0
+
+### Added
+- **Multi-CLI support** — ClaudeScope now also parses other agent CLIs' local
+  logs when present (OpenAI Codex, Cursor, Aider, Gemini CLI, GitHub Copilot
+  CLI) via a pluggable `src/sources/` adapter architecture, normalized into the
+  same shape and tagged by source. Claude Code parsing is unchanged. A source
+  legend/filter appears only when more than one source is detected; "search
+  across all your agents." Non-Claude adapters are best-effort/experimental.
+- **Offline percentile badge** — "~top X% of token users (est.)", computed
+  100% offline from a heuristic distribution table shipped in the package
+  (clearly labeled as a rough estimate, not measured population data). Shown on
+  the dashboard and the Wrapped card.
+- **Claude Code plugin** (`plugin/`) — `/claudescope` (launch the dashboard) and
+  `/claudescope:wrapped` (summarize your stats) slash commands, plus a
+  marketplace manifest so `/plugin marketplace add JoniMartin27/claudescope`
+  works.
+- **Comparison / SEO landing page** (`website/`) — a static, dependency-free
+  GitHub-Pages-ready site leading with search + privacy, with an honest
+  ClaudeScope-vs-ccusage-vs-CCHV-vs-Sniffly-vs-tokscale comparison table.
+
 ## 0.3.0
 
 ### Added

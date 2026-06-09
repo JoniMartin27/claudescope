@@ -57,6 +57,8 @@ All of it from the transcripts already on your disk — **100% local, zero netwo
 | 🧠 **Insights & archetype** | Plain-language one-liners about your habits, plus a coding archetype derived from your patterns. |
 | 📈 **Momentum & streaks** | Week-over-week trend and active-day streaks. |
 | 🪄 **Wrapped share card** | A shareable, **anonymized** year-in-review — generated entirely in your browser. |
+| 🔌 **Multi-CLI** | Also picks up your **Codex, Cursor, Aider, Gemini & Copilot CLI** logs when present — search across all your agents (Claude Code is the reference; others are best-effort). |
+| 🏆 **Percentile badge** | A rough, **100% offline** "top X% of token users" estimate, also on your Wrapped card. |
 | 📱 **Installable PWA** | Install it as a standalone app on desktop or your phone; works offline after first load. Plus a compact `/widget.html`. |
 | 💵 **Real API cost (opt-in)** | A local relabel toggle, and an **off-by-default** connector to the Anthropic Usage API for your true billed usage. |
 | ⬇️ **Export** | One click to a Markdown summary, per-day CSV, or raw JSON. |
