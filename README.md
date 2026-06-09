@@ -7,14 +7,14 @@
 **See where your Claude Code time, tokens and money actually go — and search every session you've ever run.**
 
 [![tests](https://img.shields.io/badge/tests-passing-4ade80)](test/)
-[![npm](https://img.shields.io/npm/v/claudescope?color=cb3837&logo=npm)](https://www.npmjs.com/package/claudescope)
+[![npm](https://img.shields.io/npm/v/claudescope-cli?color=cb3837&logo=npm)](https://www.npmjs.com/package/claudescope-cli)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Zero dependencies](https://img.shields.io/badge/dependencies-0-success)](package.json)
 [![100% local](https://img.shields.io/badge/data-100%25%20local-4ade80)](#-privacy-first)
 
 ```bash
-npx claudescope
+npx claudescope-cli
 ```
 
 *That's it. No install, no config, no account, no network. Your browser opens a dashboard built entirely from the transcripts already on your disk.*
@@ -58,20 +58,22 @@ That data is locked inside thousands of raw `.jsonl` lines. **ClaudeScope unlock
 
 ```bash
 # Run it (Node 18+)
-npx claudescope
+npx claudescope-cli
 
 # Custom port, don't auto-open the browser
-npx claudescope --port 4400 --no-open
+npx claudescope-cli --port 4400 --no-open
 
 # Pipe the raw analytics somewhere else
-npx claudescope --json > usage.json
+npx claudescope-cli --json > usage.json
 
 # Point at a non-default location
-npx claudescope --dir /path/to/.claude
+npx claudescope-cli --dir /path/to/.claude
 
 # Show all flags
-npx claudescope --help     # or -h
+npx claudescope-cli --help     # or -h
 ```
+
+> The npm package is **`claudescope-cli`**; the command it installs is **`claudescope`** (so `npm i -g claudescope-cli` then just `claudescope`).
 
 By default the dashboard opens at **http://127.0.0.1:4317** (override with `--port`). ClaudeScope auto-detects your Claude Code data directory — it honors `CLAUDE_CONFIG_DIR`, then falls back to `~/.claude`, then `$XDG_CONFIG_HOME/claude` and `~/.config/claude`. It reads the transcripts, builds the dashboard in memory, and serves it on `127.0.0.1` only.
 
