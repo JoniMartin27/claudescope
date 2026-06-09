@@ -54,6 +54,11 @@ All of it from the transcripts already on your disk — **100% local, zero netwo
 | 🍩 **Token mix & model spend** | Where your tokens go (hint: mostly cache) and cost per model. |
 | 🧭 **Typical session** | Median / p90 cost, messages and duration — plus interrupted-session detection. |
 | 🔥 **Activity heatmap & timeline** | Your rhythm by weekday × hour, and daily trend by cost **or** tokens. |
+| 🧠 **Insights & archetype** | Plain-language one-liners about your habits, plus a coding archetype derived from your patterns. |
+| 📈 **Momentum & streaks** | Week-over-week trend and active-day streaks. |
+| 🪄 **Wrapped share card** | A shareable, **anonymized** year-in-review — generated entirely in your browser. |
+| 📱 **Installable PWA** | Install it as a standalone app on desktop or your phone; works offline after first load. Plus a compact `/widget.html`. |
+| 💵 **Real API cost (opt-in)** | A local relabel toggle, and an **off-by-default** connector to the Anthropic Usage API for your true billed usage. |
 | ⬇️ **Export** | One click to a Markdown summary, per-day CSV, or raw JSON. |
 
 ## Quick start
@@ -90,6 +95,63 @@ This is the whole point:
 
 Your AI coding history is some of the most sensitive data you own. It should never leave your machine to be understood — so it doesn't.
 
+## Install it as an app
+
+ClaudeScope is an installable **PWA**. Open the dashboard, then:
+
+- **Desktop:** click your browser's **Install** button (the ⊕ / install icon in
+  the address bar) to launch ClaudeScope in its own standalone window.
+- **Mobile:** open the URL in your phone's browser and choose **Add to Home
+  Screen**.
+
+It registers an offline service worker, so the app shell loads even with no
+network — still 100% local, still zero phone-home. Want something smaller? The
+compact **`/widget.html`** view shows just the key stat cards, ideal for a
+pinned mini-window or a home-screen shortcut.
+
+## See it on your phone
+
+By default ClaudeScope binds to `127.0.0.1`, so it's only reachable from the
+machine it runs on. To open it on your phone (on the same Wi-Fi), bind to your
+LAN address explicitly:
+
+```bash
+npx claudescope-cli --host 0.0.0.0
+```
+
+It prints the LAN URL to open on your phone, e.g. `http://192.168.1.42:4317`.
+
+> ⚠️ **Loud privacy caveat.** `--host 0.0.0.0` (or any non-loopback host)
+> exposes your **entire Claude Code history to everyone on the same network** —
+> no auth, no password. Only use it on a network you trust, and stop the server
+> when you're done. The default `127.0.0.1` bind never leaves your machine.
+
+## Real API cost
+
+Most users are on a flat-rate plan, so the dashboard's dollar figures are an
+**estimate** at list API rates (see below). Two extras let you sharpen that:
+
+- **API-cost mode** — a toggle in the settings popover that relabels the
+  estimate as your "API cost at list rates." It's purely cosmetic, stored in
+  your browser's `localStorage`; it changes no numbers and makes no requests.
+- **Anthropic Usage API connector (opt-in, off by default)** — to pull your
+  *real* billed usage, set an admin key and click the connector button:
+
+  ```bash
+  ANTHROPIC_ADMIN_KEY=sk-ant-admin-... npx claudescope-cli
+  ```
+
+  Without that env var the feature stays dormant. It only ever fires on an
+  **explicit click** (`/api/anthropic-usage`) — the default dashboard still
+  makes **zero** network requests.
+
+## Share your Wrapped card
+
+**ClaudeScope Wrapped** turns your usage into a shareable year-in-review card.
+It's **anonymized** — no project names, no prompts, no content — and generated
+**entirely in your browser**. Nothing is uploaded; you get an image to share if
+*you* choose to.
+
 ## About the cost numbers
 
 Most Claude Code users are on a flat-rate **Max** or **Pro** subscription, so the dollar figures are **not a bill**. They estimate what your token volume *would* cost on the pay-as-you-go Anthropic API at list prices — a relative gauge of intensity, not money spent. Cache reads and writes are priced with Anthropic's published multipliers (0.1× and 1.25× the input rate).
@@ -116,10 +178,11 @@ No framework, no bundler, no database. It parses ~35k messages in well under two
 
 ## Roadmap
 
-- [ ] Session detail view (full conversation replay)
-- [ ] Export a shareable, anonymized usage card
-- [ ] Diff usage between date ranges
-- [ ] Per-day token/cost CSV export
+- [x] Session detail view (full conversation replay)
+- [x] Export a shareable, anonymized usage card (ClaudeScope Wrapped)
+- [x] Diff usage between date ranges
+- [x] Per-day token/cost CSV export
+- [x] Installable PWA + offline service worker
 - [ ] Support for other agent CLIs that log JSONL
 
 Ideas and PRs welcome — see [the issues](https://github.com/JoniMartin27/claudescope/issues).

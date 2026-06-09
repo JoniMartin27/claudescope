@@ -3,6 +3,34 @@
 All notable changes to ClaudeScope are documented here. This project follows
 [Semantic Versioning](https://semver.org).
 
+## 0.3.0
+
+### Added
+- **Installable PWA.** A web-app manifest and offline service worker mean you
+  can install ClaudeScope from your browser's address bar (desktop) or
+  **Add to Home Screen** (mobile) and launch it in a standalone window. The
+  shell works offline after the first load — still 100% local, zero network.
+- **Compact widget view** — `/widget.html`, a stripped-down at-a-glance panel
+  (key stat cards) for pinning in a small window or a phone home screen.
+- **LAN access via `--host`** — `npx claudescope-cli --host 0.0.0.0` binds to
+  your machine's LAN address and prints a phone-reachable URL, so you can open
+  the dashboard on your phone. **Opt-in and loud about it:** binding anything
+  other than `127.0.0.1` exposes your full Claude history to everyone on the
+  same network, and the CLI warns you accordingly. Default stays loopback-only.
+- **API-cost mode** — a local relabel toggle that reframes the estimated cost
+  as "API cost at list rates" (stored in `localStorage`, no behavior change to
+  the numbers). Plus an **opt-in Anthropic Usage API connector**
+  (`/api/anthropic-usage`) that fetches your real billed usage — **off by
+  default**, only fires on an explicit click, and only works if you set
+  `ANTHROPIC_ADMIN_KEY`. The default dashboard still makes zero network calls.
+- **ClaudeScope Wrapped** — a shareable, **anonymized** year-in-review card
+  generated **entirely client-side** (no upload, no project names, no content).
+- **Insights one-liners + coding archetype** — plain-language takeaways about
+  your usage, and a fun archetype derived from your patterns.
+- **Weekly momentum + streaks** — week-over-week trend and active-day streaks.
+- **Regex search + range diff** — search with regular expressions, and diff
+  usage between two date ranges.
+
 ## 0.2.0
 
 ### Fixed (correctness)
