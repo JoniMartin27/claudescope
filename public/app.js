@@ -70,7 +70,11 @@ function bars(containerId, rows, { color2 = false, max } = {}) {
   const m = max || Math.max(...rows.map((r) => r.value), 1);
   for (const r of rows) {
     const row = el('div', 'bar-row' + (color2 ? ' c2' : ''));
-    row.appendChild(el('div', 'lbl', r.label));
+    // Escape at this shared choke point: labels reaching bars() include
+    // transcript-derived project names (renderProjects) and tool names
+    // (renderTools), which are NOT a trusted set — escape so no caller can
+    // reintroduce an XSS hole. (r.display is always formatter output.)
+    row.appendChild(el('div', 'lbl', escapeHtml(r.label)));
     const track = el('div', 'bar-track');
     const fill = el('div', 'bar-fill');
     fill.style.width = Math.max(2, (r.value / m) * 100) + '%';
@@ -142,11 +146,11 @@ function renderTokenMix(a) {
   const aria = segs.map((s) => `${s.label} ${Math.round((s.val / total) * 100)}%`).join(', ');
   const svg = `<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Token mix: ${aria}"><title>Token mix: ${aria}</title>${circles}
     <text x="${C}" y="${C - 2}" text-anchor="middle" fill="#e7e9ee" font-size="17" font-weight="700" aria-hidden="true">${fmt.num(total)}</text>
-    <text x="${C}" y="${C + 14}" text-anchor="middle" fill="#6b7280" font-size="9" aria-hidden="true">tokens</text></svg>`;
+    <text x="${C}" y="${C + 14}" text-anchor="middle" fill="#8d96a6" font-size="9" aria-hidden="true">tokens</text></svg>`;
   const legend = segs
     .map(
       (s) =>
-        `<div class="li"><span class="dot" style="background:${COLORS[s.key]}"></span>${s.label} <b>${fmt.num(s.val)}</b> <span style="color:#6b7280">(${Math.round((s.val / total) * 100)}%)</span></div>`
+        `<div class="li"><span class="dot" style="background:${COLORS[s.key]}"></span>${s.label} <b>${fmt.num(s.val)}</b> <span style="color:var(--faint)">(${Math.round((s.val / total) * 100)}%)</span></div>`
     )
     .join('');
   $('#tokenMix').innerHTML = svg + `<div class="legend">${legend}</div>`;
@@ -157,12 +161,14 @@ function renderTimeline(a) {
   const c = $('#timeline');
   c.innerHTML = '';
   if (!days.length) {
-    c.innerHTML = '<p style="color:#6b7280">No dated activity found.</p>';
+    c.innerHTML = '<p class="muted">No dated activity found.</p>';
     return;
   }
-  const max = Math.max(...days.map((d) => d.cost), 0.0001);
-  // show up to last 60 active days
+  // show up to last 60 active days, and scale bars to the peak WITHIN that
+  // window (not the all-time peak, which may be off-screen and would squash
+  // every visible bar).
   const slice = days.slice(-60);
+  const max = Math.max(...slice.map((d) => d.cost), 0.0001);
   for (const d of slice) {
     const bar = el('div', 'tl-bar');
     bar.style.height = Math.max(2, (d.cost / max) * 100) + '%';

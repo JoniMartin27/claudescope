@@ -35,7 +35,7 @@ function collectToolNames(content, into) {
   }
 }
 
-const SEARCH_MAX = 8000; // chars of each message indexed for full-text search
+const SEARCH_MAX = 4000; // chars of each message indexed for full-text search (bounds index memory)
 const SNIPPET = 280;
 
 function basename(p) {
@@ -194,10 +194,18 @@ export async function parseAll(claudeDir, { onProgress } = {}) {
   const root = projectsDir(claudeDir);
   const sessions = [];
   const messages = [];
-  const projectDirs = fs
-    .readdirSync(root, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name);
+  // Guard the top-level scan so a missing/non-directory projects root (or a
+  // TOCTOU race, or any direct programmatic caller) yields an empty result the
+  // dashboard/JSON can still render, instead of a raw ENOENT/ENOTDIR stack.
+  let projectDirs = [];
+  try {
+    projectDirs = fs
+      .readdirSync(root, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  } catch {
+    return { sessions, messages };
+  }
 
   let done = 0;
   let totalFiles = 0;

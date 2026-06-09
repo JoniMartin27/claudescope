@@ -42,15 +42,29 @@ test('cwd recovers a hyphenated folder label that the encoded name would split',
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('search finds terms far beyond the first 2000 characters', async () => {
+test('search finds terms well beyond the first 2000 characters', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-deep-'));
-  const filler = 'x'.repeat(5000);
+  const filler = 'x'.repeat(3000); // needle lands ~3000 chars in — past 2000, within the 4000 index cap
   write(dir, 'C--p', 's.jsonl', [
     { type: 'user', sessionId: 'd1', timestamp: '2026-06-01T10:00:00Z', cwd: 'C:\\p',
       message: { role: 'user', content: `${filler} NEEDLEWORD ${filler}` } },
   ]);
   const { messages } = await parseAll(dir);
-  assert.equal(search(messages, 'needleword').length, 1, 'must match a term ~5000 chars in');
+  assert.equal(search(messages, 'needleword').length, 1, 'must match a term ~3000 chars in');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseAll returns an empty result (no throw) when the projects root is missing or a file', async () => {
+  // missing directory entirely
+  const missing = path.join(os.tmpdir(), 'cs-nope-' + Math.abs(Date.now() % 1e6));
+  const r1 = await parseAll(missing);
+  assert.deepEqual(r1, { sessions: [], messages: [] });
+
+  // "projects" exists but is a regular file, not a directory
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-file-'));
+  fs.writeFileSync(path.join(dir, 'projects'), 'not a dir');
+  const r2 = await parseAll(dir);
+  assert.deepEqual(r2, { sessions: [], messages: [] });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

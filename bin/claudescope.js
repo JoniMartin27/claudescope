@@ -77,13 +77,22 @@ async function main() {
     process.exit(1);
   }
   // findClaudeDir() already verified projects/, but an explicit --dir bypasses
-  // that — validate it here so we fail with a friendly message, not an ENOENT.
-  if (explicitDir && !fs.existsSync(path.join(claudeDir, 'projects'))) {
-    console.error(
-      `${C.yellow}No "projects" folder found under ${claudeDir}.${C.reset}\n` +
-        `Point --dir at your .claude directory (the one that contains a "projects" folder).`
-    );
-    process.exit(1);
+  // that — validate it here so we fail with a friendly message, not an ENOENT
+  // (or an ENOTDIR if "projects" exists but is a file / broken symlink).
+  if (explicitDir) {
+    let st;
+    try {
+      st = fs.statSync(path.join(claudeDir, 'projects'));
+    } catch {
+      /* missing */
+    }
+    if (!st || !st.isDirectory()) {
+      console.error(
+        `${C.yellow}No "projects" folder found under ${claudeDir}.${C.reset}\n` +
+          `Point --dir at your .claude directory (the one that contains a "projects" folder).`
+      );
+      process.exit(1);
+    }
   }
 
   if (has('--json')) {

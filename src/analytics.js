@@ -16,7 +16,15 @@ function newUsage() {
 }
 
 function dayKey(ts) {
-  return ts ? ts.slice(0, 10) : null; // YYYY-MM-DD
+  // Local-time YYYY-MM-DD so the timeline agrees with the local-time heatmap
+  // (slicing the ISO string would bucket in UTC and disagree near midnight).
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (isNaN(d)) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /**
@@ -97,7 +105,9 @@ export function buildAnalytics(sessions) {
     // by version
     if (s.version) byVersion.set(s.version, (byVersion.get(s.version) || 0) + 1);
 
-    // by day (use lastTs as session day anchor for cost; messages spread on firstTs)
+    // by day: the whole session's cost + message count are bucketed on its
+    // first-message local day. (Per-reply day-splitting like the heatmap does
+    // is possible but unnecessary here — sessions rarely cross midnight.)
     const dk = dayKey(s.firstTs);
     if (dk) {
       if (!byDay.has(dk)) byDay.set(dk, { day: dk, sessions: 0, messages: 0, cost: 0 });
