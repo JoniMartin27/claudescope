@@ -1,3 +1,5 @@
+import { buildReportHtml } from '/report.js';
+
 const $ = (sel) => document.querySelector(sel);
 const LOCALE = (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
 const REDUCE = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -487,7 +489,7 @@ async function runSearch(q) {
     }
     row.appendChild(el('div', 'r-head', `<span class="tag ${role}">${role}</span>${srcTag}<span class="r-proj">${escapeHtml(r.project)}</span><span class="r-proj">${fmt.date(r.ts)}</span><span class="r-open">open ↗</span>`));
     row.appendChild(el('div', 'r-text', highlight(escapeHtml(r.snippet), q)));
-    const open = () => openSession(r.sessionId, r.snippet.slice(0, 60));
+    const open = () => openSession(r.sessionId, r.snippet.slice(0, 60), { query: q, snippet: r.snippet });
     row.addEventListener('click', open);
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
@@ -526,7 +528,48 @@ function restoreFocus() {
 }
 
 // ---------- session detail modal ----------
-async function openSession(id, label) {
+// Normalize transcript/snippet text the same way: collapse whitespace + lowercase.
+// The search snippet is `text.replace(/\s+/g,' ').slice(0,N)` so matching a
+// turn's whitespace-collapsed text against the snippet is robust to the
+// formatting differences (and to truncation — we test a leading chunk).
+function normForMatch(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+// Pick the index of the turn that best matches a search hit. Try the snippet
+// substring first (most precise), then fall back to query terms. Returns -1 if
+// nothing matches (caller just opens at the top).
+function findTurnIndex(turns, jump) {
+  if (!jump || !Array.isArray(turns) || !turns.length) return -1;
+  const norm = turns.map((t) => normForMatch(t.text));
+  const snip = normForMatch(jump.snippet);
+  if (snip) {
+    // The snippet may have been truncated/merged; test progressively shorter
+    // leading chunks so a partial overlap still lands on the right turn.
+    for (const len of [snip.length, 80, 48, 24]) {
+      if (len > snip.length) continue;
+      const probe = snip.slice(0, len).trim();
+      if (probe.length < 8) break;
+      const i = norm.findIndex((n) => n.includes(probe));
+      if (i !== -1) return i;
+    }
+  }
+  const terms = String(jump.query || '')
+    .split(/\s+/)
+    .map((t) => normForMatch(t))
+    .filter((t) => t.length >= 2);
+  if (terms.length) {
+    // Prefer the turn containing the most distinct query terms.
+    let best = -1, bestScore = 0;
+    for (let i = 0; i < norm.length; i++) {
+      let score = 0;
+      for (const term of terms) if (norm[i].includes(term)) score++;
+      if (score > bestScore) { bestScore = score; best = i; }
+    }
+    if (bestScore > 0) return best;
+  }
+  return -1;
+}
+async function openSession(id, label, jump) {
   const modal = $('#modal');
   const body = $('#modalBody');
   $('#modalTitle').textContent = label ? label : 'Session';
@@ -546,16 +589,38 @@ async function openSession(id, label) {
     const turns = total > CAP ? c.turns.slice(-CAP) : c.turns;
     const note = total > CAP ? `<div class="convo-note">Showing the most recent ${CAP} of ${fmt.int(total)} turns.</div>` : '';
     const meta = [c.cwd ? escapeHtml(c.cwd.split(/[\\/]/).pop()) : null, c.gitBranch ? '⎇ ' + escapeHtml(c.gitBranch) : null, c.version ? 'v' + escapeHtml(c.version) : null, `${fmt.int(total)} turns`].filter(Boolean).join(' · ');
-    body.innerHTML = `<div class="convo-meta">${meta}</div>${note}` + turns.map(turnHtml).join('');
+    // When opened from a search result, locate the matched turn so we can scroll
+    // to it and highlight both the turn and the query terms inside it.
+    const hitIdx = findTurnIndex(turns, jump);
+    const query = jump && jump.query ? jump.query : '';
+    body.innerHTML = `<div class="convo-meta">${meta}</div>${note}` + turns.map((t, i) => turnHtml(t, i, i === hitIdx ? query : '')).join('');
+    if (hitIdx !== -1) jumpToTurn(body, hitIdx);
   } catch {
     body.innerHTML = '<div class="modal-loading">Couldn\'t load this session transcript.</div>';
   }
 }
-function turnHtml(t) {
+// Scroll the matched turn into view and flash a temporary highlight ring.
+function jumpToTurn(body, idx) {
+  const target = body.querySelector(`.ct[data-turn="${idx}"]`);
+  if (!target) return;
+  target.classList.add('ct-hit');
+  // Defer to next frame so layout is settled before scrolling within the modal.
+  requestAnimationFrame(() => {
+    try {
+      target.scrollIntoView({ block: 'center', behavior: REDUCE ? 'auto' : 'smooth' });
+    } catch {
+      target.scrollIntoView();
+    }
+  });
+}
+function turnHtml(t, idx, query) {
   const who = t.kind === 'tool_result' ? 'tool' : t.role;
   const tools = (t.tools || []).length ? ` <span class="ct-tools">${t.tools.map((x) => escapeHtml(x)).join(' ')}</span>` : '';
-  const text = t.text ? escapeHtml(t.text) : '<span class="muted">(no text)</span>';
-  return `<div class="ct ct-${who}"><div class="ct-head"><span class="tag ${who === 'assistant' ? 'assistant' : who === 'user' ? 'user' : 'toolr'}">${who}</span>${t.model ? `<span class="ct-model">${escapeHtml(modelShort(t.model))}</span>` : ''}<span class="ct-ts">${fmt.dateTime(t.ts)}</span>${tools}</div><div class="ct-text">${text}</div></div>`;
+  let text = t.text ? escapeHtml(t.text) : '<span class="muted">(no text)</span>';
+  // Mark the query terms inside the matched turn (reuses the search highlight()).
+  if (query && t.text) text = highlight(text, query);
+  const attr = idx == null ? '' : ` data-turn="${idx}"`;
+  return `<div class="ct ct-${who}"${attr}><div class="ct-head"><span class="tag ${who === 'assistant' ? 'assistant' : who === 'user' ? 'user' : 'toolr'}">${who}</span>${t.model ? `<span class="ct-model">${escapeHtml(modelShort(t.model))}</span>` : ''}<span class="ct-ts">${fmt.dateTime(t.ts)}</span>${tools}</div><div class="ct-text">${text}</div></div>`;
 }
 function closeModal() {
   const m = $('#modal');
@@ -614,6 +679,16 @@ function exportMarkdown(a) {
     a.byProject.slice(0, 10).map((p) => `| ${p.label} | ${fmt.money(p.cost)} |`).join('\n') +
     `\n\n_Generated locally by 🔭 ClaudeScope · npx claudescope-cli_\n`;
   download('claudescope-summary.md', md, 'text/markdown');
+}
+
+const RANGE_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', all: 'All time' };
+function exportHtmlReport(a) {
+  const html = buildReportHtml(a, { fmt, escapeHtml }, {
+    rangeLabel: RANGE_LABELS[STATE.range] || 'All time',
+    apiMode: apiMode(),
+    generatedAt: a.generatedAt,
+  });
+  download('claudescope-report.html', html, 'text/html;charset=utf-8');
 }
 
 // ---------- settings popover + Anthropic usage connector ----------
@@ -992,6 +1067,7 @@ function setupControls() {
       if (fmtType === 'json') exportJSON(STATE.analytics);
       if (fmtType === 'csv') exportCSV(STATE.analytics);
       if (fmtType === 'md') exportMarkdown(STATE.analytics);
+      if (fmtType === 'html') exportHtmlReport(STATE.analytics);
       menu.hidden = true;
     });
   }

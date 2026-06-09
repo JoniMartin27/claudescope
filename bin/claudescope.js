@@ -3,7 +3,9 @@ import { spawn } from 'node:child_process';
 import { findClaudeDir } from '../src/paths.js';
 import { createServer } from '../src/server.js';
 import { parseAllSources } from '../src/parser.js';
-import { buildAnalytics } from '../src/analytics.js';
+import { buildAnalytics, weekOverWeek } from '../src/analytics.js';
+import { recordSnapshot, readSnapshots, computeStreak } from '../src/snapshots.js';
+import { makeDump, mergeDumps } from '../src/merge.js';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +22,21 @@ function has(flag) {
 function opt(name, def) {
   const i = args.indexOf(name);
   return i !== -1 && args[i + 1] ? args[i + 1] : def;
+}
+/**
+ * Collect every value after a variadic flag up to the next flag (a token
+ * starting with "-"). e.g. `--merge a.json ./team b.json --output x` -> the
+ * three paths. Returns [] when the flag is absent.
+ */
+function optList(name) {
+  const i = args.indexOf(name);
+  if (i === -1) return [];
+  const out = [];
+  for (let j = i + 1; j < args.length; j++) {
+    if (args[j].startsWith('-')) break;
+    out.push(args[j]);
+  }
+  return out;
 }
 
 const C = {
@@ -44,6 +61,9 @@ function help() {
   npx claudescope --no-open       Don't auto-open the browser
   npx claudescope --json          Print analytics as JSON to stdout and exit
   npx claudescope --json --output usage.json   Write the JSON to a file
+  npx claudescope --weekly        Print a plain-text "Scope Report" and exit (no server)
+  npx claudescope --dump-sessions me.json   Write your raw sessions for team mode (local)
+  npx claudescope --merge ./team  Merge everyone's dumps (files/folders) -> combined JSON
   npx claudescope --dir <path>    Point at a specific .claude directory
   npx claudescope --host 0.0.0.0  Expose on the LAN (phones) — see warning below
   npx claudescope --version       Print the version (-v)
@@ -54,7 +74,84 @@ ${C.bold}Privacy${C.reset}
   127.0.0.1, and never makes a single network request. Your data never leaves
   your machine. Using --host to bind anything other than 127.0.0.1/localhost
   exposes your full Claude history to everyone on the same network.
+
+${C.bold}Weekly ritual${C.reset}
+  --weekly prints a concise text digest (week-over-week deltas, streak,
+  archetype, top project, percentile) computed 100% locally — no server, no
+  network. Append it to a log on a schedule:
+    Windows (Task Scheduler / PowerShell):  claudescope --weekly >> scope.log
+    macOS/Linux (cron, Mondays at 9am):     0 9 * * 1 claudescope --weekly >> ~/scope.log
+
+${C.bold}Team mode (local, no server)${C.reset}
+  Aggregate several machines'/people's usage with zero infrastructure — no
+  upload, no server. Each person exports their raw sessions, drops the file in
+  a shared folder (Drive/Dropbox/network share), then anyone merges them:
+    1) everyone runs:   claudescope --dump-sessions me.json
+    2) drop me.json into a shared folder
+    3) anyone runs:     claudescope --merge ./team   (or: --merge a.json b.json)
+  --merge reads the dumps, runs analytics over the combined set, and prints the
+  merged JSON (or writes it with --output). Bad/non-matching files are skipped
+  with a note. The dump is the raw sessions array (the analytics INPUT), since
+  analytics output is already aggregated and can't be re-merged faithfully.
 `);
+}
+
+/** Compact USD/token formatting for the plain-text digest. */
+function fmtUsd(n) {
+  return '$' + (Number(n) || 0).toFixed(2);
+}
+function fmtTokens(n) {
+  const v = Number(n) || 0;
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return String(Math.round(v));
+}
+/** Signed percent like "+12%" / "-4%" / "n/a" (null = no prior baseline). */
+function fmtDelta(pct) {
+  if (pct == null) return 'n/a';
+  const r = Math.round(pct);
+  return (r >= 0 ? '+' : '') + r + '%';
+}
+
+/**
+ * Build the plain-text "Scope Report" digest. Plain ASCII (+ a couple emoji
+ * accents) so it stays readable when piped to a file. `now` is injectable.
+ */
+function buildWeeklyDigest(analytics, snapshots, now = new Date()) {
+  const wow = weekOverWeek(analytics, now);
+  const streak = computeStreak(snapshots, now);
+  const tw = wow.thisWeek;
+  const lw = wow.lastWeek;
+  const d = wow.deltaPct;
+  const t = analytics.totals || {};
+  const arch = (analytics.archetype && analytics.archetype.name) || 'Unclassified';
+  const topProject = (analytics.byProject && analytics.byProject[0]) || null;
+  const pct = t.percentile || {};
+
+  const lines = [];
+  lines.push('ClaudeScope — Weekly Scope Report');
+  lines.push(now.toISOString().slice(0, 10));
+  lines.push('='.repeat(40));
+  lines.push('');
+  lines.push('This week vs last week:');
+  lines.push(`  Cost:     ${fmtUsd(tw.cost)} vs ${fmtUsd(lw.cost)}   (${fmtDelta(d.cost)})`);
+  lines.push(`  Tokens:   ${fmtTokens(tw.tokens)} vs ${fmtTokens(lw.tokens)}   (${fmtDelta(d.tokens)})`);
+  lines.push(`  Sessions: ${tw.sessions} vs ${lw.sessions}   (${fmtDelta(d.sessions)})`);
+  lines.push('');
+  lines.push(`🔥 Streak:    ${streak} day${streak === 1 ? '' : 's'}`);
+  lines.push(`Archetype:    ${arch}`);
+  if (topProject) {
+    lines.push(`Top project:  ${topProject.label || topProject.path || '(unknown)'} (${fmtUsd(topProject.cost)} all-time)`);
+  } else {
+    lines.push('Top project:  (none yet)');
+  }
+  if (pct.label) {
+    lines.push(`Percentile:   You're in the ${pct.label} of Claude Code token usage (heuristic).`);
+  }
+  lines.push('');
+  lines.push(`All-time: ${t.sessions || 0} sessions · ${fmtTokens(t.tokens)} tokens · ${fmtUsd(t.cost)}`);
+  return lines.join('\n');
 }
 
 /** Best-effort machine LAN IPv4 (first non-internal), or null. */
@@ -90,6 +187,44 @@ async function main() {
     return;
   }
   if (has('--help') || has('-h')) return help();
+
+  // Team mode (local): merge session dumps from files/dirs. This needs no
+  // Claude data directory of its own — it reads the shared dump files. 100%
+  // local, zero network.
+  if (has('--merge')) {
+    const paths = optList('--merge');
+    if (!paths.length) {
+      console.error(
+        `${C.yellow}--merge needs one or more paths (files and/or folders of session dumps).${C.reset}\n` +
+          `Example: claudescope --merge ./team   (folder of *.json dumps)`
+      );
+      process.exit(1);
+    }
+    const { sessions, loaded, skipped } = mergeDumps(paths, {
+      onSkip: (file, reason) => console.error(`${C.yellow}skip${C.reset} ${file} — ${reason}`),
+    });
+    if (!loaded.length) {
+      console.error(
+        `${C.yellow}No valid session dumps found.${C.reset} ` +
+          `Each person should run: claudescope --dump-sessions me.json`
+      );
+      process.exit(1);
+    }
+    const totalDumpSessions = loaded.reduce((n, l) => n + l.count, 0);
+    console.error(
+      `Merged ${loaded.length} dump${loaded.length === 1 ? '' : 's'} ` +
+        `(${totalDumpSessions} sessions${skipped.length ? `, skipped ${skipped.length}` : ''}).`
+    );
+    const json = JSON.stringify(buildAnalytics(sessions), null, 2);
+    const outFile = opt('--output', null) || opt('-o', null);
+    if (outFile) {
+      fs.writeFileSync(outFile, json + '\n'); // utf8, no BOM
+      console.error(`Wrote merged analytics to ${outFile}`);
+    } else {
+      process.stdout.write(json + '\n');
+    }
+    return;
+  }
 
   const explicitDir = opt('--dir', null);
   const claudeDir = explicitDir || findClaudeDir();
@@ -131,6 +266,37 @@ async function main() {
       process.stdout.write(json + '\n');
     }
     return;
+  }
+
+  // Team mode (local): dump the RAW normalized sessions array — the shareable
+  // unit for merging. Analytics output is aggregated/lossy and can't be
+  // re-merged faithfully, so we write the buildAnalytics INPUT instead.
+  if (has('--dump-sessions')) {
+    const outFile = opt('--dump-sessions', null);
+    if (!outFile) {
+      console.error(`${C.yellow}--dump-sessions needs a file path, e.g. claudescope --dump-sessions me.json${C.reset}`);
+      process.exit(1);
+    }
+    const { sessions } = await parseAllSources(claudeDir);
+    const dump = makeDump(sessions, { source: opt('--label', null) || os.hostname() });
+    fs.writeFileSync(outFile, JSON.stringify(dump) + '\n'); // utf8, no BOM
+    console.error(`Wrote ${sessions.length} sessions to ${outFile} (share it; then: claudescope --merge <folder>)`);
+    return;
+  }
+
+  if (has('--weekly')) {
+    const { sessions } = await parseAllSources(claudeDir);
+    const analytics = buildAnalytics(sessions);
+    // Record today's snapshot so streaks accrue when the digest runs on a
+    // schedule (best-effort, local-only, never touches the network).
+    recordSnapshot({
+      sessions: analytics.totals.sessions,
+      cost: analytics.totals.cost,
+      tokens: analytics.totals.tokens,
+    });
+    const digest = buildWeeklyDigest(analytics, readSnapshots());
+    process.stdout.write(digest + '\n');
+    return; // exit 0
   }
 
   banner();

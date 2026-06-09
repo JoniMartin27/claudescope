@@ -4,11 +4,12 @@
 // same-origin shell the browser already loaded.
 // Bump CACHE on every shell change so returning visitors don't get a stale
 // app. The fetch handler also uses stale-while-revalidate as a second guard.
-const CACHE = 'claudescope-v0.3.0';
+const CACHE = 'claudescope-v0.5.0';
 const SHELL = [
   '/',
   '/index.html',
   '/app.js',
+  '/report.js',
   '/styles.css',
   '/widget.html',
   '/manifest.webmanifest',

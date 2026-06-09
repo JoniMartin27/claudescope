@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseAllSources, readConversation } from './parser.js';
-import { buildAnalytics, search } from './analytics.js';
+import { buildAnalytics, search, weekOverWeek, deltaPct } from './analytics.js';
 import { projectsDir } from './paths.js';
 import { recordSnapshot, readSnapshots, computeStreak } from './snapshots.js';
 import { fetchAnthropicCost } from './anthropic.js';
@@ -39,12 +39,6 @@ function localDayKey(now = new Date()) {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-/** Percent change from `prev` to `cur`, null when prev is 0 (no baseline). */
-function deltaPct(cur, prev) {
-  if (!prev) return cur ? null : 0;
-  return ((cur - prev) / prev) * 100;
 }
 
 function serveStatic(res, urlPath) {
@@ -185,34 +179,12 @@ export async function createServer(claudeDir, { onLog, host } = {}) {
 
     if (pathname === '/api/momentum') {
       const all = JSON.parse(analyticsFor('all').json);
-      const byDay = all.byDay || [];
-      const byDayMap = new Map(byDay.map((d) => [d.day, d]));
-      const blank = () => ({ cost: 0, tokens: 0, sessions: 0 });
-      const sumWindow = (startOffset) => {
-        const acc = blank();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date();
-          d.setDate(d.getDate() - startOffset - i);
-          const row = byDayMap.get(localDayKey(d));
-          if (row) {
-            acc.cost += row.cost || 0;
-            acc.tokens += row.tokens || 0;
-            acc.sessions += row.sessions || 0;
-          }
-        }
-        return acc;
-      };
-      const thisWeek = sumWindow(0); // last 7 local days (today .. -6)
-      const lastWeek = sumWindow(7); // the 7 days before that
+      const wow = weekOverWeek(all); // shared window math (also used by --weekly)
       return sendJson(res, 200, {
         streak: computeStreak(readSnapshots()),
-        thisWeek,
-        lastWeek,
-        deltaPct: {
-          cost: deltaPct(thisWeek.cost, lastWeek.cost),
-          tokens: deltaPct(thisWeek.tokens, lastWeek.tokens),
-          sessions: deltaPct(thisWeek.sessions, lastWeek.sessions),
-        },
+        thisWeek: wow.thisWeek,
+        lastWeek: wow.lastWeek,
+        deltaPct: wow.deltaPct,
       });
     }
 

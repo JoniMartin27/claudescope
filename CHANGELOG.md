@@ -3,6 +3,22 @@
 All notable changes to ClaudeScope are documented here. This project follows
 [Semantic Versioning](https://semver.org).
 
+## 0.5.0
+
+### Added
+- **Jump to message** — opening a session from a search result now scrolls to
+  and highlights the matched message inside the replay view (completes find→read).
+- **`--weekly` digest** — a plain-text "Scope Report" (this week vs last,
+  streak, archetype, top project, percentile) for a cron / Task Scheduler ritual.
+  Computed locally; no server, no network.
+- **HTML report export** — a single self-contained `.html` report (inline
+  styles, opens offline) from the Export menu, respecting the active date range.
+- **Local team mode** — `--dump-sessions <file>` writes a shareable raw-session
+  dump; `--merge <paths…>` aggregates several dumps locally into combined
+  analytics. Zero infrastructure, nothing uploaded.
+- **`docs/EXTENDING.md`** — the source-adapter contract for adding custom data
+  sources and panels, plus contribution rules.
+
 ## 0.4.0
 
 ### Added
