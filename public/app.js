@@ -52,6 +52,20 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
+// ---------- settings (localStorage-backed, fully local) ----------
+function apiMode() {
+  try {
+    return localStorage.getItem('apiMode') === '1';
+  } catch {
+    return false;
+  }
+}
+function setApiMode(on) {
+  try {
+    localStorage.setItem('apiMode', on ? '1' : '0');
+  } catch {}
+}
+
 const COLORS = { input: '#36c5d0', output: '#d97757', cacheWrite: '#b18cf0', cacheRead: '#4ade80' };
 const MODEL_COLORS = ['#d97757', '#36c5d0', '#b18cf0', '#4ade80', '#fbbf24', '#f472b6'];
 const DAYNAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -73,7 +87,7 @@ function renderCards(a) {
     { k: 'Sessions', v: fmt.int(t.sessions), x: `${fmt.date(t.firstTs)} → ${fmt.date(t.lastTs)}`, c: '' },
     { k: 'Messages', v: fmt.num(t.messages), x: `${fmt.num(t.userMsgs)} prompts · ${fmt.num(t.assistantMsgs)} replies`, c: 'c2' },
     { k: 'Tokens', v: fmt.num(t.tokens), x: `${fmt.num(t.tokens / days)}/day across the wire`, c: 'c3' },
-    { k: 'Est. API cost', v: fmt.money(t.cost), x: 'if billed at list API rates', c: 'c4' },
+    { k: apiMode() ? 'API cost' : 'Est. API cost', v: fmt.money(t.cost), x: apiMode() ? 'at list API rates' : 'if billed at list API rates', c: 'c4' },
     { k: 'Saved by cache', v: fmt.money(t.cacheSavings), x: `${fmt.pct(t.cacheHitRate)} of input served from cache`, c: 'c5' },
     { k: 'Tool calls', v: fmt.num(t.tools), x: `${a.byTool.length} distinct tools`, c: '' },
   ];
@@ -98,13 +112,114 @@ function renderTypical(a) {
     .join('');
 }
 
+// ---------- insights strip + archetype ----------
+function renderInsights(a) {
+  const host = $('#insightsStrip');
+  if (!host) return;
+  const insights = Array.isArray(a.insights) ? a.insights : [];
+  if (!insights.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  // insights are plain text from the backend, but escape defensively — they
+  // interpolate transcript-derived project/model names.
+  host.innerHTML = insights.map((i) => `<div class="insight-chip">${escapeHtml(i)}</div>`).join('');
+}
+
+function renderArchetype(a) {
+  const chip = $('#archetypeChip');
+  if (!chip) return;
+  const arc = a.archetype;
+  if (!arc) {
+    chip.hidden = true;
+    return;
+  }
+  chip.hidden = false;
+  chip.innerHTML =
+    `<span class="arc-emoji" aria-hidden="true">${escapeHtml(arc.emoji || '🧭')}</span>` +
+    `<span class="arc-text"><b>${escapeHtml(arc.name || '')}</b><small>${escapeHtml(arc.blurb || '')}</small></span>`;
+}
+
+// ---------- momentum + streak ----------
+function deltaBadge(pct) {
+  if (pct == null) return '<span class="delta flat">— no baseline</span>';
+  const up = pct >= 0;
+  const cls = pct === 0 ? 'flat' : up ? 'up' : 'down';
+  const arrow = pct === 0 ? '→' : up ? '▲' : '▼';
+  return `<span class="delta ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
+}
+async function loadMomentum() {
+  const host = $('#momentumStrip');
+  if (!host) return;
+  let m;
+  try {
+    m = await fetch('/api/momentum').then((r) => r.json());
+  } catch {
+    host.hidden = true;
+    return;
+  }
+  const dp = m.deltaPct || {};
+  const streak = m.streak || 0;
+  host.hidden = false;
+  host.innerHTML =
+    `<div class="mo-item"><div class="mo-k">This week vs last</div>` +
+    `<div class="mo-v">${fmt.money(m.thisWeek ? m.thisWeek.cost : 0)} ${deltaBadge(dp.cost)}</div>` +
+    `<div class="mo-x">cost · ${fmt.num(m.thisWeek ? m.thisWeek.tokens : 0)} tok ${deltaBadge(dp.tokens)}</div></div>` +
+    `<div class="mo-item"><div class="mo-k">Streak</div>` +
+    `<div class="mo-v">🔥 ${fmt.int(streak)}</div>` +
+    `<div class="mo-x">${streak === 1 ? 'week' : 'weeks'} of activity</div></div>`;
+}
+
+// ---------- range diff (deltaPct on stat cards) ----------
+async function loadDiff(range) {
+  // Clear any prior badges first.
+  document.querySelectorAll('#cards .card-delta').forEach((n) => n.remove());
+  if (range === 'all') return;
+  let d;
+  try {
+    d = await fetch('/api/diff?range=' + encodeURIComponent(range)).then((r) => r.json());
+  } catch {
+    return;
+  }
+  if (STATE.range !== range) return; // user switched away mid-fetch
+  const dp = d.deltaPct || {};
+  const label = `previous ${range.replace('d', 'd')}`;
+  // Map stat-card index → diff key. Cards order: Sessions, Messages, Tokens,
+  // cost, cache savings, tools.
+  const map = [
+    { idx: 0, pct: dp.sessions },
+    { idx: 1, pct: dp.messages },
+    { idx: 2, pct: dp.tokens },
+    { idx: 3, pct: dp.cost },
+  ];
+  const cards = document.querySelectorAll('#cards .card');
+  for (const { idx, pct } of map) {
+    if (pct == null) continue;
+    const card = cards[idx];
+    if (!card) continue;
+    const up = pct >= 0;
+    const cls = pct === 0 ? 'flat' : up ? 'up' : 'down';
+    const arrow = pct === 0 ? '→' : up ? '▲' : '▼';
+    const badge = el('div', 'card-delta ' + cls, `${arrow} ${Math.abs(pct).toFixed(0)}% vs ${escapeHtml(label)}`);
+    card.appendChild(badge);
+  }
+}
+
 function renderMeta(a, meta) {
   $('#meta').innerHTML =
     `<div><b>${fmt.int(meta.sessions)}</b> sessions · <b>${fmt.num(meta.messages)}</b> messages indexed</div>` +
     `<div>generated ${new Date(a.generatedAt).toLocaleString(LOCALE)}</div>`;
-  $('#disclaimer').textContent =
-    'Costs are estimates of what your token volume would cost on the pay-as-you-go Anthropic API at list prices — not your actual bill. ' +
-    'If you are on a Max or Pro subscription, this is a relative gauge of intensity, not money spent.';
+  renderDisclaimer();
+}
+
+function renderDisclaimer() {
+  const node = $('#disclaimer');
+  if (!node) return;
+  node.textContent = apiMode()
+    ? 'Costs are computed from your token volume at current Anthropic list API prices. Treat as a close approximation of API spend — your actual invoice is authoritative.'
+    : 'Costs are estimates of what your token volume would cost on the pay-as-you-go Anthropic API at list prices — not your actual bill. ' +
+      'If you are on a Max or Pro subscription, this is a relative gauge of intensity, not money spent.';
 }
 
 // ---------- bars ----------
@@ -288,25 +403,54 @@ function renderSessions(a) {
 
 // ---------- search ----------
 let searchTimer;
+let regexMode = false;
+function reSearch() {
+  const q = $('#search').value.trim();
+  if (q.length < (regexMode ? 1 : 2)) {
+    $('#searchResults').innerHTML = '';
+    $('#searchHint').textContent = '';
+    return;
+  }
+  runSearch(q);
+}
 function setupSearch() {
   const input = $('#search');
   input.addEventListener('input', () => {
     clearTimeout(searchTimer);
     const q = input.value.trim();
-    if (q.length < 2) {
+    if (q.length < (regexMode ? 1 : 2)) {
       $('#searchResults').innerHTML = '';
       $('#searchHint').textContent = '';
       return;
     }
     searchTimer = setTimeout(() => runSearch(q), 180);
   });
+  const toggle = $('#regexToggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      regexMode = !regexMode;
+      toggle.classList.toggle('active', regexMode);
+      toggle.setAttribute('aria-pressed', regexMode ? 'true' : 'false');
+      $('#search').setAttribute('placeholder', regexMode
+        ? 'Regex search… e.g. TODO|FIXME'
+        : 'Search across every prompt, reply and tool call…');
+      reSearch();
+    });
+  }
 }
 async function runSearch(q) {
   $('#searchHint').textContent = 'searching…';
-  const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=40').then((r) => r.json());
-  const total = res.total ?? res.results.length;
-  $('#searchHint').textContent = `${fmt.int(total)} ${total === 1 ? 'match' : 'matches'}`;
+  const url = '/api/search?q=' + encodeURIComponent(q) + '&limit=40' + (regexMode ? '&regex=1' : '');
+  const res = await fetch(url).then((r) => r.json());
   const c = $('#searchResults');
+  if (res.error === 'bad regex') {
+    $('#searchHint').textContent = 'invalid regex';
+    c.innerHTML = '';
+    c.appendChild(el('div', 'result empty regex-bad', 'Invalid regular expression — check your pattern.'));
+    return;
+  }
+  const total = res.total ?? res.results.length;
+  $('#searchHint').textContent = `${fmt.int(total)} ${total === 1 ? 'match' : 'matches'}${regexMode ? ' · regex' : ''}`;
   c.innerHTML = '';
   if (!res.results.length) {
     c.appendChild(el('div', 'result empty', `No matches for "${escapeHtml(q)}"`));
@@ -338,6 +482,26 @@ function highlight(escapedText, q) {
   return text;
 }
 
+// ---------- modal focus management (WCAG 2.4.3 / 2.1.2) ----------
+let lastFocused = null;
+function trapFocus(e, modal) {
+  if (e.key !== 'Tab') return;
+  const f = modal.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])');
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+function focusModal(modal) {
+  lastFocused = document.activeElement;
+  const target = modal.querySelector('.modal-close') || modal;
+  target.focus();
+}
+function restoreFocus() {
+  if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+  lastFocused = null;
+}
+
 // ---------- session detail modal ----------
 async function openSession(id, label) {
   const modal = $('#modal');
@@ -346,6 +510,7 @@ async function openSession(id, label) {
   body.innerHTML = '<div class="modal-loading">Loading conversation…</div>';
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
+  focusModal(modal);
   try {
     const c = await fetch('/api/session?id=' + encodeURIComponent(id)).then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))));
     const CAP = 600;
@@ -368,6 +533,7 @@ function closeModal() {
   const m = $('#modal');
   if (m) m.hidden = true;
   document.body.style.overflow = '';
+  restoreFocus();
 }
 function setupModal() {
   const m = $('#modal');
@@ -375,8 +541,16 @@ function setupModal() {
   m.addEventListener('click', (e) => {
     if (e.target === m || e.target.closest('[data-close]')) closeModal();
   });
+  m.addEventListener('keydown', (e) => trapFocus(e, m));
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !m.hidden) closeModal();
+    if (e.key !== 'Escape') return;
+    if (!m.hidden) closeModal();
+    const sm = $('#shareModal');
+    if (sm && !sm.hidden) {
+      sm.hidden = true;
+      document.body.style.overflow = '';
+      restoreFocus();
+    }
   });
 }
 
@@ -414,6 +588,250 @@ function exportMarkdown(a) {
   download('claudescope-summary.md', md, 'text/markdown');
 }
 
+// ---------- settings popover + Anthropic usage connector ----------
+function setupSettings() {
+  const btn = $('#settingsBtn');
+  const menu = $('#settingsMenu');
+  const toggle = $('#apiModeToggle');
+  if (!btn || !menu || !toggle) return;
+  toggle.checked = apiMode();
+  const syncExpanded = () => btn.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+  const closeMenu = (restoreFocus) => {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    syncExpanded();
+    if (restoreFocus) btn.focus();
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    syncExpanded();
+    if (!menu.hidden) toggle.focus();
+  });
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => closeMenu(false));
+  // Esc closes the popover and returns focus to the gear (WCAG 2.1.2 / no trap).
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeMenu(true);
+    }
+  });
+  toggle.addEventListener('change', () => {
+    setApiMode(toggle.checked);
+    if (STATE.analytics) renderCards(STATE.analytics);
+    renderDisclaimer();
+    if (STATE.range !== 'all') loadDiff(STATE.range); // re-attach badges after card re-render
+  });
+
+  const usageBtn = $('#anthropicUsageBtn');
+  const usageOut = $('#anthropicUsageOut');
+  if (usageBtn && usageOut) {
+    usageBtn.addEventListener('click', async () => {
+      usageOut.hidden = false;
+      usageOut.textContent = 'Contacting Anthropic…';
+      try {
+        const res = await fetch('/api/anthropic-usage?days=30').then((r) => r.json());
+        if (res.error) {
+          usageOut.innerHTML =
+            `<span class="muted">${escapeHtml(res.error)}</span>`;
+          return;
+        }
+        const billed = res.totalCost != null ? res.totalCost : res.cost;
+        usageOut.innerHTML = billed != null
+          ? `Real billed (last 30d): <b>${fmt.money(billed)}</b>`
+          : `<span class="muted">Received usage data — no cost total in response.</span>`;
+      } catch {
+        usageOut.innerHTML = '<span class="muted">Request failed. This feature is opt-in and off by default.</span>';
+      }
+    });
+  }
+}
+
+// ---------- wrapped share card (anonymized, 100% client-side) ----------
+function shareStats(a) {
+  const t = a.totals;
+  const u = t.usage || {};
+  const totalTok = (u.input || 0) + (u.output || 0) + (u.cacheWrite || 0) + (u.cacheRead || 0) || 1;
+  // Busiest weekday/hour from the heatmap.
+  let best = -1, bd = 0, bh = 0;
+  if (Array.isArray(a.heatmap)) {
+    for (let d = 0; d < a.heatmap.length; d++)
+      for (let h = 0; h < (a.heatmap[d] || []).length; h++)
+        if (a.heatmap[d][h] > best) { best = a.heatmap[d][h]; bd = d; bh = h; }
+  }
+  return {
+    sessions: t.sessions,
+    tokens: t.tokens,
+    cost: t.cost,
+    cacheSavings: t.cacheSavings,
+    mix: {
+      cacheRead: (u.cacheRead || 0) / totalTok,
+      cacheWrite: (u.cacheWrite || 0) / totalTok,
+      input: (u.input || 0) / totalTok,
+      output: (u.output || 0) / totalTok,
+    },
+    topTools: (a.byTool || []).slice(0, 4).map((x) => x.tool),
+    busiest: best > 0 ? `${DAYFULL[bd]} · ${fmtHour(bh)}` : null,
+    archetype: a.archetype || null,
+  };
+}
+function drawShareCard(a) {
+  const canvas = $('#shareCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 1200, H = 630;
+  const s = shareStats(a);
+  // Background — dark theme matching the app.
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#16181f');
+  g.addColorStop(1, '#0e0f13');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // Accent glow corners.
+  const glow = ctx.createRadialGradient(120, 60, 0, 120, 60, 520);
+  glow.addColorStop(0, 'rgba(217,119,87,0.18)');
+  glow.addColorStop(1, 'rgba(217,119,87,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const FONT = '-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+  // Header.
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#e7e9ee';
+  ctx.font = `700 38px ${FONT}`;
+  ctx.fillText('🔭 My Claude Code, wrapped', 64, 96);
+  if (s.archetype) {
+    ctx.fillStyle = '#d97757';
+    ctx.font = `600 26px ${FONT}`;
+    ctx.fillText(`${s.archetype.emoji || ''} ${s.archetype.name || ''}`, 64, 138);
+  }
+
+  // Big stats row.
+  const stats = [
+    [fmtCompact(s.sessions), 'sessions'],
+    [fmtCompact(s.tokens), 'tokens'],
+    [s.cost > 0 ? fmt.money(s.cost) : fmt.money(s.cacheSavings), s.cost > 0 ? 'est. API cost' : 'saved by cache'],
+  ];
+  let x = 64;
+  for (const [v, k] of stats) {
+    ctx.fillStyle = '#e7e9ee';
+    ctx.font = `800 58px ${FONT}`;
+    ctx.fillText(v, x, 240);
+    ctx.fillStyle = '#9aa3b2';
+    ctx.font = `500 22px ${FONT}`;
+    ctx.fillText(k, x, 274);
+    x += 360;
+  }
+
+  // Token-mix split bar.
+  const mixY = 330, mixH = 26, mixW = W - 128;
+  const segs = [
+    ['cacheRead', s.mix.cacheRead, '#4ade80'],
+    ['cacheWrite', s.mix.cacheWrite, '#b18cf0'],
+    ['input', s.mix.input, '#36c5d0'],
+    ['output', s.mix.output, '#d97757'],
+  ];
+  let mx = 64;
+  for (const [, frac, color] of segs) {
+    const w = Math.max(0, frac * mixW);
+    ctx.fillStyle = color;
+    ctx.fillRect(mx, mixY, w, mixH);
+    mx += w;
+  }
+  ctx.fillStyle = '#8d96a6';
+  ctx.font = `500 20px ${FONT}`;
+  const mixLabel = segs
+    .map(([name, frac]) => `${name} ${Math.round(frac * 100)}%`)
+    .join('   ·   ');
+  ctx.fillText('Token mix:  ' + mixLabel, 64, mixY + mixH + 34);
+
+  // Bottom detail rows.
+  ctx.font = `500 24px ${FONT}`;
+  ctx.fillStyle = '#e7e9ee';
+  let by = 470;
+  if (s.busiest) {
+    ctx.fillText(`⏰ Busiest: ${s.busiest}`, 64, by);
+    by += 42;
+  }
+  if (s.topTools.length) {
+    ctx.fillText(`🛠 Top tools: ${s.topTools.join(', ')}`, 64, by);
+  }
+
+  // Footer watermark.
+  ctx.fillStyle = '#8d96a6';
+  ctx.font = `600 24px ${FONT}`;
+  ctx.fillText('🔭 ClaudeScope · npx claudescope-cli', 64, H - 44);
+}
+function fmtCompact(n) {
+  return fmt.num(n);
+}
+function shareCaption(a) {
+  const s = shareStats(a);
+  const arc = s.archetype ? `${s.archetype.emoji || ''} ${s.archetype.name || ''} — ` : '';
+  const money = s.cost > 0 ? `~${fmt.money(s.cost)} in est. API value` : `${fmt.money(s.cacheSavings)} saved by cache`;
+  return (
+    `${arc}my Claude Code, wrapped:\n` +
+    `${fmt.int(s.sessions)} sessions · ${fmt.num(s.tokens)} tokens · ${money}.\n` +
+    `See yours locally → npx claudescope-cli  🔭`
+  );
+}
+function setupShare() {
+  const btn = $('#shareBtn');
+  const modal = $('#shareModal');
+  if (!btn || !modal) return;
+  btn.addEventListener('click', () => {
+    if (!STATE.analytics) return;
+    drawShareCard(STATE.analytics);
+    const tweet = $('#shareTweet');
+    if (tweet) tweet.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareCaption(STATE.analytics));
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    focusModal(modal);
+  });
+  modal.addEventListener('keydown', (e) => trapFocus(e, modal));
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal || e.target.closest('[data-close]')) {
+      modal.hidden = true;
+      document.body.style.overflow = '';
+      restoreFocus();
+    }
+  });
+  const dl = $('#shareDownload');
+  if (dl) {
+    dl.addEventListener('click', () => {
+      const canvas = $('#shareCanvas');
+      if (!canvas) return;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = el('a');
+        a.href = url;
+        a.download = 'claudescope-wrapped.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+    });
+  }
+  const copy = $('#shareCopy');
+  if (copy) {
+    copy.addEventListener('click', async () => {
+      if (!STATE.analytics) return;
+      const text = shareCaption(STATE.analytics);
+      try {
+        await navigator.clipboard.writeText(text);
+        copy.textContent = '✓ Copied';
+        setTimeout(() => (copy.textContent = '📋 Copy post text'), 1500);
+      } catch {
+        copy.textContent = '📋 Copy failed';
+        setTimeout(() => (copy.textContent = '📋 Copy post text'), 1500);
+      }
+    });
+  }
+}
+
 // ---------- skeleton / loading ----------
 function renderSkeleton() {
   const cards = $('#cards');
@@ -429,6 +847,8 @@ const STATE = { range: 'all', analytics: null };
 
 function renderAll(a) {
   STATE.analytics = a;
+  renderInsights(a);
+  renderArchetype(a);
   renderCards(a);
   renderTypical(a);
   renderTokenMix(a);
@@ -449,6 +869,7 @@ async function loadRange(range) {
     // empty range — show zeros but keep the bar usable
   }
   renderAll(a);
+  loadDiff(range);
 }
 
 function setupControls() {
@@ -506,6 +927,9 @@ async function boot() {
   setupSearch();
   setupControls();
   setupModal();
+  setupSettings();
+  setupShare();
+  loadMomentum();
 }
 
 boot().catch((e) => {

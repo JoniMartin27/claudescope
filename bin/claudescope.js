@@ -7,6 +7,7 @@ import { buildAnalytics } from '../src/analytics.js';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 const args = process.argv.slice(2);
 const pkg = JSON.parse(
@@ -44,14 +45,32 @@ function help() {
   npx claudescope --json          Print analytics as JSON to stdout and exit
   npx claudescope --json --output usage.json   Write the JSON to a file
   npx claudescope --dir <path>    Point at a specific .claude directory
+  npx claudescope --host 0.0.0.0  Expose on the LAN (phones) — see warning below
   npx claudescope --version       Print the version (-v)
   npx claudescope --help          Show this help (-h)
 
 ${C.bold}Privacy${C.reset}
   100% local. Reads your transcripts from disk, serves a dashboard on
   127.0.0.1, and never makes a single network request. Your data never leaves
-  your machine.
+  your machine. Using --host to bind anything other than 127.0.0.1/localhost
+  exposes your full Claude history to everyone on the same network.
 `);
+}
+
+/** Best-effort machine LAN IPv4 (first non-internal), or null. */
+function lanIPv4() {
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const list of Object.values(ifaces)) {
+      for (const i of list || []) {
+        const fam = typeof i.family === 'number' ? i.family === 4 : i.family === 'IPv4';
+        if (fam && !i.internal) return i.address;
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
 }
 
 function openBrowser(url) {
@@ -120,13 +139,32 @@ async function main() {
     console.error(`${C.yellow}Invalid --port "${opt('--port', '')}". Use a number between 1 and 65535.${C.reset}`);
     process.exit(1);
   }
-  const { server } = await createServer(claudeDir, { onLog: (m) => console.log(`   ${C.dim}${m}${C.reset}`) });
+  const host = opt('--host', '127.0.0.1');
+  const isLocal = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  const { server } = await createServer(claudeDir, {
+    onLog: (m) => console.log(`   ${C.dim}${m}${C.reset}`),
+    host,
+  });
 
-  server.listen(port, '127.0.0.1', () => {
-    const url = `http://127.0.0.1:${port}`;
+  server.listen(port, host, () => {
+    // For a local bind, the loopback URL is the real one. For a LAN bind
+    // (e.g. 0.0.0.0) point at the machine's LAN IPv4 so phones can reach it.
+    const lanIp = isLocal ? null : lanIPv4();
+    const displayHost = isLocal ? host : lanIp || host;
+    const url = `http://${displayHost}:${port}`;
+    if (!isLocal) {
+      console.log(
+        `\n   ${C.yellow}${C.bold}⚠ Exposing your Claude history on the local network at ${url} — ` +
+          `anyone on this Wi-Fi can read it. Ctrl+C to stop.${C.reset}`
+      );
+    }
     console.log(`\n   ${C.green}${C.bold}➜${C.reset}  Dashboard ready at ${C.cyan}${C.bold}${url}${C.reset}`);
+    if (!isLocal && lanIp) {
+      console.log(`   ${C.dim}Open this on your phone: ${C.reset}${C.cyan}http://${lanIp}:${port}${C.reset}`);
+    }
     console.log(`   ${C.dim}Press Ctrl+C to stop.${C.reset}\n`);
-    if (!has('--no-open')) openBrowser(url);
+    // Only auto-open a browser for the local bind (a LAN bind is for phones).
+    if (!has('--no-open') && isLocal) openBrowser(`http://${host}:${port}`);
   });
 
   // Clean shutdown on Ctrl+C / termination.

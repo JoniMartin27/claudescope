@@ -77,6 +77,24 @@ test('search supports role/project filters and returns total + truncated', async
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('search regex mode matches a valid pattern and errors (no throw) on a bad one', async () => {
+  const { dir } = tmp([
+    { type: 'user', sessionId: 'x', timestamp: '2026-06-01T10:00:00Z', cwd: 'C:\\proj', message: { role: 'user', content: 'deploy widget v2' } },
+    { type: 'assistant', sessionId: 'x', timestamp: '2026-06-01T10:00:01Z', message: { id: 'm', model: 'claude-sonnet-4-6', content: [{ type: 'text', text: 'rolling back widget v3' }], usage: { output_tokens: 1 } } },
+  ]);
+  const { messages } = await parseAll(dir);
+  // A working pattern: "widget v" followed by a digit, case-insensitive.
+  const ok = search(messages, 'widget v\\d', { regex: true });
+  assert.equal(ok.total, 2);
+  assert.equal(ok.error, undefined);
+  // Anchored regex that substring search could never satisfy.
+  assert.equal(search(messages, '^rolling back', { regex: true }).total, 1);
+  // An invalid pattern returns the documented error shape and does NOT throw.
+  const bad = search(messages, '(', { regex: true });
+  assert.deepEqual(bad, { results: [], total: 0, truncated: false, error: 'bad regex' });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('tool_use input is searchable and interruptions are detected', async () => {
   const { dir } = tmp([
     { type: 'user', sessionId: 'x', timestamp: '2026-06-01T10:00:00Z', cwd: 'C:\\proj', message: { role: 'user', content: 'do it' } },

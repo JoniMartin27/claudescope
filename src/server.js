@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { parseAll, readConversation } from './parser.js';
 import { buildAnalytics, search } from './analytics.js';
 import { projectsDir } from './paths.js';
+import { recordSnapshot, readSnapshots, computeStreak } from './snapshots.js';
+import { fetchAnthropicCost } from './anthropic.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -16,6 +18,9 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
 };
 
 function send(res, status, body, type = 'application/json; charset=utf-8', extra) {
@@ -27,6 +32,20 @@ function sendJson(res, status, obj) {
 }
 
 const RANGES = { '7d': 7, '30d': 30, '90d': 90 };
+
+/** Local-time YYYY-MM-DD for a Date (defaults to now). */
+function localDayKey(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Percent change from `prev` to `cur`, null when prev is 0 (no baseline). */
+function deltaPct(cur, prev) {
+  if (!prev) return cur ? null : 0;
+  return ((cur - prev) / prev) * 100;
+}
 
 function serveStatic(res, urlPath) {
   let rel = urlPath === '/' ? '/index.html' : urlPath;
@@ -45,12 +64,32 @@ function serveStatic(res, urlPath) {
   });
 }
 
-export async function createServer(claudeDir, { onLog } = {}) {
+export async function createServer(claudeDir, { onLog, host } = {}) {
   const log = onLog || (() => {});
+  const bindHost = host || '127.0.0.1';
   log('Scanning transcripts…');
   const t0 = Date.now();
   const { sessions, messages } = await parseAll(claudeDir);
   log(`Parsed ${sessions.length} sessions, ${messages.length} messages in ${Date.now() - t0}ms`);
+
+  // Window helpers for the momentum/diff endpoints: filter sessions to the
+  // last N local days (offset N days back so we can compare against the
+  // preceding window) and build analytics over just that slice.
+  function sessionsInWindow(days, offsetDays = 0) {
+    const ms = 86400000;
+    const until = Date.now() - offsetDays * days * ms;
+    const since = until - days * ms;
+    return sessions.filter((s) => {
+      if (!s.lastTs) return false;
+      const t = new Date(s.lastTs).getTime();
+      return !isNaN(t) && t >= since && t < until;
+    });
+  }
+  function totalsForWindow(days, offsetDays = 0) {
+    const a = buildAnalytics(sessionsInWindow(days, offsetDays));
+    const t = a.totals;
+    return { cost: t.cost, tokens: t.tokens, sessions: t.sessions, messages: t.messages };
+  }
 
   // Map sessionId -> transcript file so the detail view can re-read on demand.
   const sessionIndex = new Map();
@@ -103,6 +142,7 @@ export async function createServer(claudeDir, { onLog } = {}) {
         limit: parseInt(params.get('limit') || '100', 10),
         role: params.get('role') || undefined,
         project: params.get('project') || undefined,
+        regex: params.get('regex') === '1',
       });
       return sendJson(res, 200, out);
     }
@@ -124,6 +164,83 @@ export async function createServer(claudeDir, { onLog } = {}) {
       return sendJson(res, 200, { claudeDir, sessions: sessions.length, messages: messages.length });
     }
 
+    if (pathname === '/api/insights') {
+      const all = JSON.parse(analyticsFor('all').json);
+      return sendJson(res, 200, { insights: all.insights, archetype: all.archetype });
+    }
+
+    if (pathname === '/api/momentum') {
+      const all = JSON.parse(analyticsFor('all').json);
+      const byDay = all.byDay || [];
+      const byDayMap = new Map(byDay.map((d) => [d.day, d]));
+      const blank = () => ({ cost: 0, tokens: 0, sessions: 0 });
+      const sumWindow = (startOffset) => {
+        const acc = blank();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - startOffset - i);
+          const row = byDayMap.get(localDayKey(d));
+          if (row) {
+            acc.cost += row.cost || 0;
+            acc.tokens += row.tokens || 0;
+            acc.sessions += row.sessions || 0;
+          }
+        }
+        return acc;
+      };
+      const thisWeek = sumWindow(0); // last 7 local days (today .. -6)
+      const lastWeek = sumWindow(7); // the 7 days before that
+      return sendJson(res, 200, {
+        streak: computeStreak(readSnapshots()),
+        thisWeek,
+        lastWeek,
+        deltaPct: {
+          cost: deltaPct(thisWeek.cost, lastWeek.cost),
+          tokens: deltaPct(thisWeek.tokens, lastWeek.tokens),
+          sessions: deltaPct(thisWeek.sessions, lastWeek.sessions),
+        },
+      });
+    }
+
+    if (pathname === '/api/diff') {
+      const range = RANGES[params.get('range')] ? params.get('range') : '7d';
+      const days = RANGES[range];
+      const current = totalsForWindow(days, 0);
+      const previous = totalsForWindow(days, 1);
+      return sendJson(res, 200, {
+        range,
+        current,
+        previous,
+        deltaPct: {
+          cost: deltaPct(current.cost, previous.cost),
+          tokens: deltaPct(current.tokens, previous.tokens),
+          sessions: deltaPct(current.sessions, previous.sessions),
+          messages: deltaPct(current.messages, previous.messages),
+        },
+      });
+    }
+
+    // OPT-IN, off by default. The ONLY endpoint that may touch the network,
+    // and only when an admin key is explicitly configured. Without a key we
+    // return 400 and make ZERO network requests.
+    if (pathname === '/api/anthropic-usage') {
+      const key =
+        process.env.ANTHROPIC_ADMIN_KEY ||
+        (typeof req.headers['x-cs-admin-key'] === 'string' ? req.headers['x-cs-admin-key'] : '');
+      if (!key) {
+        return sendJson(res, 400, {
+          error: 'No Anthropic admin key configured. Set ANTHROPIC_ADMIN_KEY to enable (opt-in, off by default).',
+        });
+      }
+      const days = parseInt(params.get('days') || '30', 10);
+      try {
+        const data = await fetchAnthropicCost({ apiKey: key, days: isNaN(days) ? 30 : days });
+        return sendJson(res, 200, data);
+      } catch (err) {
+        return sendJson(res, 502, { error: err && err.message ? err.message : 'Anthropic request failed' });
+      }
+    }
+
     if (pathname.startsWith('/api/')) {
       return sendJson(res, 404, { error: 'unknown endpoint' });
     }
@@ -132,5 +249,15 @@ export async function createServer(claudeDir, { onLog } = {}) {
   });
 
   const analytics = JSON.parse(analyticsFor('all').json);
-  return { server, analytics, sessions, messages, analyticsFor };
+
+  // Record today's totals as the single, local-only persisted snapshot. This is
+  // best-effort (silently no-ops on any fs error) and never reaches the network.
+  recordSnapshot({
+    date: localDayKey(),
+    sessions: analytics.totals.sessions,
+    cost: analytics.totals.cost,
+    tokens: analytics.totals.tokens,
+  });
+
+  return { server, analytics, sessions, messages, analyticsFor, host: bindHost };
 }

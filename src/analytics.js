@@ -1,4 +1,6 @@
 import { priceForModel, CACHE_READ_MULT } from './pricing.js';
+import { classifyArchetype } from './archetype.js';
+import { buildInsights } from './insights.js';
 
 function usageTokens(u) {
   return (u.input || 0) + (u.output || 0) + (u.cacheWrite || 0) + (u.cacheRead || 0);
@@ -197,7 +199,7 @@ export function buildAnalytics(sessions) {
     }))
     .sort(sortByCost);
 
-  return {
+  const result = {
     generatedAt: new Date().toISOString(),
     totals: { ...totals, tokens: usageTokens(totals.usage) },
     byProject: [...byProject.values()].map((p) => ({ ...p, tokens: usageTokens(p.usage) })).sort(sortByCost),
@@ -212,26 +214,54 @@ export function buildAnalytics(sessions) {
     heatmap,
     sessions: topSessions,
   };
+
+  // Derived, purely-local extras computed from the shaped payload above.
+  result.archetype = classifyArchetype(result);
+  result.insights = buildInsights(result);
+
+  return result;
 }
 
 /**
  * Case-insensitive full-text search across message records.
- * opts: { limit, role: 'user'|'assistant', project } — all optional.
- * Returns { results, total, truncated } so the UI can show "N+ / showing M".
+ * opts: { limit, role: 'user'|'assistant', project, regex } — all optional.
+ * When opts.regex is true the (trimmed) query is compiled to a case-insensitive
+ * RegExp and matched against each message's lowercased haystack; an invalid
+ * pattern is caught and reported as { results:[], total:0, truncated:false,
+ * error:'bad regex' } rather than thrown. Otherwise it's a space-separated
+ * AND-of-substrings match.
+ * Returns { results, total, truncated } (+ optional error) so the UI can show
+ * "N+ / showing M".
  */
 export function search(messages, query, opts = {}) {
   const limit = opts.limit && opts.limit > 0 ? opts.limit : 100;
   const role = opts.role === 'user' || opts.role === 'assistant' ? opts.role : null;
   const project = opts.project ? String(opts.project).toLowerCase() : null;
-  const q = (query || '').trim().toLowerCase();
-  if (!q) return { results: [], total: 0, truncated: false };
-  const terms = q.split(/\s+/);
+  const raw = (query || '').trim();
+  if (!raw) return { results: [], total: 0, truncated: false };
+  const q = raw.toLowerCase();
+
+  // Build the matcher up front. In regex mode a bad pattern short-circuits to
+  // the documented error shape so callers never have to wrap search() in try.
+  let re = null;
+  let terms = null;
+  if (opts.regex) {
+    try {
+      re = new RegExp(q, 'i');
+    } catch {
+      return { results: [], total: 0, truncated: false, error: 'bad regex' };
+    }
+  } else {
+    terms = q.split(/\s+/);
+  }
+  const matches = re ? (lc) => re.test(lc) : (lc) => terms.every((t) => lc.includes(t));
+
   const results = [];
   let total = 0;
   for (const m of messages) {
     if (role && m.role !== role) continue;
     if (project && (m.projectLabel || '').toLowerCase() !== project) continue;
-    if (terms.every((t) => m.lc.includes(t))) {
+    if (matches(m.lc)) {
       total++;
       if (results.length < limit) {
         results.push({

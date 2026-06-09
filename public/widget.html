@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0e0f13" />
+    <title>ClaudeScope — widget</title>
+    <link rel="icon" href="/icon.svg" />
+    <style>
+      :root {
+        --bg: #0e0f13;
+        --panel: #1a1d26;
+        --panel-2: #20242f;
+        --border: #2a2f3c;
+        --text: #e7e9ee;
+        --muted: #9aa3b2;
+        --faint: #8d96a6;
+        --accent: #d97757;
+        --accent-2: #36c5d0;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        width: 360px;
+        min-height: 520px;
+        background:
+          radial-gradient(420px 240px at 18% -10%, rgba(217, 119, 87, 0.12), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        padding: 16px;
+      }
+      .head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+      .logo { font-size: 22px; filter: drop-shadow(0 2px 6px rgba(217,119,87,.4)); }
+      .head h1 { margin: 0; font-size: 15px; letter-spacing: -0.3px; }
+      .head .wk { margin-left: auto; color: var(--faint); font-size: 11px; }
+      .arch {
+        display: flex; align-items: center; gap: 10px;
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        border: 1px solid var(--border); border-radius: 12px;
+        padding: 10px 12px; margin-bottom: 12px;
+      }
+      .arch .e { font-size: 24px; }
+      .arch .n { font-weight: 700; font-size: 13.5px; }
+      .arch .b { color: var(--faint); font-size: 11px; margin-top: 1px; }
+      .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+      .stat {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 10px; padding: 9px 10px;
+      }
+      .stat .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+      .stat .v { font-size: 18px; font-weight: 700; margin-top: 3px; letter-spacing: -0.4px; }
+      .stat .sub { color: var(--faint); font-size: 10px; margin-top: 1px; }
+      .spark {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+      }
+      .spark .lbl { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+      .spark svg { display: block; width: 100%; height: 48px; }
+      .insight {
+        background: var(--panel); border: 1px solid var(--border);
+        border-left: 3px solid var(--accent-2);
+        border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;
+        color: var(--text); font-size: 12px;
+      }
+      .foot { display: flex; align-items: center; gap: 8px; }
+      .foot a {
+        color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600;
+      }
+      .foot a:hover { text-decoration: underline; }
+      .foot .upd { margin-left: auto; color: var(--faint); font-size: 10px; }
+      .muted { color: var(--faint); }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <span class="logo">🔭</span>
+      <h1>ClaudeScope</h1>
+      <span class="wk">last 7 days</span>
+    </div>
+
+    <div class="arch" id="arch"><div class="arch" style="border:0;padding:0"><span class="muted">Loading…</span></div></div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="spark">
+      <div class="lbl">Cost · last 7 days</div>
+      <div id="spark"></div>
+    </div>
+
+    <div class="insight" id="insight"><span class="muted">Loading…</span></div>
+
+    <div class="foot">
+      <a href="/">Open full dashboard ↗</a>
+      <span class="upd" id="upd"></span>
+    </div>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const LOCALE = (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+      const _compact = new Intl.NumberFormat(LOCALE, { notation: 'compact', maximumFractionDigits: 1 });
+      const _money = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'USD' });
+      const fmtNum = (n) => (n == null || isNaN(n) ? '0' : _compact.format(n));
+      const fmtMoney = (n) => {
+        if (n == null || isNaN(n)) return _money.format(0);
+        if (n > 0 && n < 0.01) return '<' + _money.format(0.01);
+        return _money.format(n);
+      };
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      }
+
+      function sparkline(values) {
+        const W = 320, H = 48, P = 3;
+        if (!values.length) return '<svg viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+        const max = Math.max(...values, 0.0001);
+        const n = values.length;
+        const step = n > 1 ? (W - P * 2) / (n - 1) : 0;
+        const y = (v) => H - P - (v / max) * (H - P * 2);
+        const pts = values.map((v, i) => [P + i * step, y(v)]);
+        const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+        const area = 'M' + P + ' ' + (H - P) + ' ' + pts.map((p) => 'L' + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ') + ' L' + (P + (n - 1) * step).toFixed(1) + ' ' + (H - P) + ' Z';
+        const last = pts[pts.length - 1];
+        return (
+          '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="7-day cost sparkline">' +
+          '<path d="' + area + '" fill="rgba(54,197,208,0.14)" />' +
+          '<path d="' + line + '" fill="none" stroke="#36c5d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3" fill="#d97757" />' +
+          '</svg>'
+        );
+      }
+
+      // Build a contiguous 7-day cost series (oldest → newest), zero-filling gaps.
+      function weekSeries(byDay) {
+        const map = new Map((byDay || []).map((d) => [d.day, d.cost || 0]));
+        const out = [];
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          out.push(map.get(key) || 0);
+        }
+        return out;
+      }
+
+      async function load() {
+        try {
+          const [mom, ins, an] = await Promise.all([
+            fetch('/api/momentum').then((r) => r.json()),
+            fetch('/api/insights').then((r) => r.json()),
+            fetch('/api/analytics?range=7d').then((r) => r.json()),
+          ]);
+
+          const arch = ins.archetype || {};
+          $('#arch').innerHTML =
+            '<span class="e">' + escapeHtml(arch.emoji || '🔭') + '</span>' +
+            '<div><div class="n">' + escapeHtml(arch.name || 'Your Claude Code style') + '</div>' +
+            '<div class="b">' + escapeHtml(arch.blurb || '') + '</div></div>';
+
+          const wk = mom.thisWeek || { cost: 0, tokens: 0, sessions: 0 };
+          const streak = mom.streak || 0;
+          $('#stats').innerHTML =
+            '<div class="stat"><div class="k">Cost</div><div class="v">' + escapeHtml(fmtMoney(wk.cost)) + '</div><div class="sub">est. API</div></div>' +
+            '<div class="stat"><div class="k">Tokens</div><div class="v">' + escapeHtml(fmtNum(wk.tokens)) + '</div><div class="sub">' + escapeHtml(fmtNum(wk.sessions)) + ' sessions</div></div>' +
+            '<div class="stat"><div class="k">Streak</div><div class="v">🔥 ' + escapeHtml(String(streak)) + '</div><div class="sub">' + (streak === 1 ? 'day' : 'days') + '</div></div>';
+
+          $('#spark').innerHTML = sparkline(weekSeries(an.byDay));
+
+          const one = (ins.insights && ins.insights[0]) || 'Run more Claude Code sessions to surface insights here.';
+          $('#insight').innerHTML = escapeHtml(one);
+
+          $('#upd').textContent = 'updated ' + new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+          $('#insight').innerHTML = '<span class="muted">' + escapeHtml('Could not load data: ' + (e && e.message ? e.message : 'error')) + '</span>';
+        }
+      }
+
+      load();
+      setInterval(load, 60000);
+    </script>
+  </body>
+</html>
