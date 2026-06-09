@@ -1,6 +1,6 @@
 {
   "name": "claudescope-cli",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Local-first analytics & full-text search for your Claude Code sessions. Zero config, zero network, one command.",
   "type": "module",
   "bin": {

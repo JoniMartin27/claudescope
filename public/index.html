@@ -65,6 +65,7 @@
             <div class="export-wrap">
               <button id="exportBtn" type="button" aria-haspopup="true">⬇ Export</button>
               <div id="exportMenu" class="export-menu" hidden>
+                <button data-export="html" type="button">HTML report</button>
                 <button data-export="md" type="button">Markdown summary</button>
                 <button data-export="csv" type="button">Per-day CSV</button>
                 <button data-export="json" type="button">Raw JSON</button>
@@ -177,6 +178,6 @@
         <p class="disclaimer" id="disclaimer"></p>
       </footer>
     </div>
-    <script src="/app.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

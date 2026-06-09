@@ -242,6 +242,58 @@ export function buildAnalytics(sessions) {
   return result;
 }
 
+/** Local-time YYYY-MM-DD for a Date (matches the byDay/heatmap bucketing). */
+function localDayKey(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Percent change from `prev` to `cur`; null when prev is 0 (no baseline). */
+export function deltaPct(cur, prev) {
+  if (!prev) return cur ? null : 0;
+  return ((cur - prev) / prev) * 100;
+}
+
+/**
+ * Week-over-week momentum from a built analytics payload. Sums the last 7 local
+ * days (today .. -6) into `thisWeek` and the 7 days before that into `lastWeek`,
+ * reading the same byDay rows the dashboard renders, then computes per-metric
+ * percent deltas. This is the single source of truth shared by the server's
+ * /api/momentum endpoint and the --weekly CLI digest (no duplicated window math).
+ * `now` is injectable so tests are deterministic.
+ */
+export function weekOverWeek(analytics, now = new Date()) {
+  const byDay = (analytics && analytics.byDay) || [];
+  const byDayMap = new Map(byDay.map((d) => [d.day, d]));
+  const sumWindow = (startOffset) => {
+    const acc = { cost: 0, tokens: 0, sessions: 0 };
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      d.setDate(d.getDate() - startOffset - i);
+      const row = byDayMap.get(localDayKey(d));
+      if (row) {
+        acc.cost += row.cost || 0;
+        acc.tokens += row.tokens || 0;
+        acc.sessions += row.sessions || 0;
+      }
+    }
+    return acc;
+  };
+  const thisWeek = sumWindow(0);
+  const lastWeek = sumWindow(7);
+  return {
+    thisWeek,
+    lastWeek,
+    deltaPct: {
+      cost: deltaPct(thisWeek.cost, lastWeek.cost),
+      tokens: deltaPct(thisWeek.tokens, lastWeek.tokens),
+      sessions: deltaPct(thisWeek.sessions, lastWeek.sessions),
+    },
+  };
+}
+
 /**
  * Case-insensitive full-text search across message records.
  * opts: { limit, role: 'user'|'assistant', project, regex } — all optional.

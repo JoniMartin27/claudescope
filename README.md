@@ -75,6 +75,9 @@ npx claudescope-cli --port 4400 --no-open
 # Pipe the raw analytics somewhere else
 npx claudescope-cli --json > usage.json
 
+# Print a plain-text weekly "Scope Report" and exit (no server, no network)
+npx claudescope-cli --weekly
+
 # Point at a non-default location
 npx claudescope-cli --dir /path/to/.claude
 
@@ -85,6 +88,59 @@ npx claudescope-cli --help     # or -h
 > The npm package is **`claudescope-cli`**; the command it installs is **`claudescope`** (so `npm i -g claudescope-cli` then just `claudescope`).
 
 By default the dashboard opens at **http://127.0.0.1:4317** (override with `--port`). ClaudeScope auto-detects your Claude Code data directory — it honors `CLAUDE_CONFIG_DIR`, then falls back to `~/.claude`, then `$XDG_CONFIG_HOME/claude` and `~/.config/claude`. It reads the transcripts, builds the dashboard in memory, and serves it on `127.0.0.1` only.
+
+### Weekly ritual
+
+`--weekly` prints a concise plain-text **Scope Report** — this-week-vs-last-week deltas (cost, tokens, sessions), your 🔥 streak, archetype, top project, and percentile — computed 100% locally with **no server and no network**. It also records today's snapshot so your streak keeps accruing. Wire it into a scheduler to get a recurring log:
+
+```bash
+# macOS / Linux — cron, every Monday at 9am
+0 9 * * 1 claudescope --weekly >> ~/scope.log
+```
+
+```powershell
+# Windows — Task Scheduler (run weekly); the action runs:
+claudescope --weekly >> "$HOME\scope.log"
+```
+
+The digest is pure ASCII + a couple of emoji accents, so it stays readable when piped to a file.
+
+### Team mode (local, no server)
+
+Want a *team* view — combined usage across several machines or teammates —
+without standing up any infrastructure? ClaudeScope merges raw session exports
+**entirely on your machine**: no server, no upload, no account. Nobody's
+transcripts ever leave their laptop except as a file *they* choose to share.
+
+```bash
+# 1) Each person exports their own raw sessions (local, read-only):
+claudescope --dump-sessions me.json
+
+# 2) Everyone drops their me.json into a shared folder
+#    (Google Drive, Dropbox, a network share, a git repo — your call),
+#    renamed so they don't collide, e.g. ./team/alice.json, ./team/bob.json
+
+# 3) Anyone merges the whole folder into one combined dashboard payload:
+claudescope --merge ./team
+
+# …or pass explicit files, and/or write the result out:
+claudescope --merge alice.json bob.json --output team-usage.json
+```
+
+`--dump-sessions <file>` writes the **raw normalized sessions array** — the exact
+input to the analytics engine. That's the shareable unit, because the analytics
+output is already aggregated and lossy and can't be re-merged faithfully. Each
+session is tagged with its origin (your hostname, or `--label <name>`).
+
+`--merge <paths…>` reads one or more dump files (and/or recurses folders for
+`*.json` that look like dumps), concatenates the sessions, runs analytics over
+the combined set, and prints the merged JSON (or writes it with `--output`).
+Bad or non-matching files are **skipped with a note on stderr**, so a stray
+README or a half-written file never breaks the merge. Provenance is preserved
+per session, so a future UI can break the combined view down by source.
+
+Both flags are **100% local** — like everything else in ClaudeScope, they make
+zero network requests.
 
 ## 🔒 Privacy first
 
@@ -198,7 +254,9 @@ node --test          # run the test suite (zero install needed)
 npm start            # launch the dashboard against your own data
 ```
 
-The codebase is deliberately tiny and dependency-free. If you add a feature, add a test for it.
+The codebase is deliberately tiny and dependency-free. If you add a feature, add a test for it. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the rules.
+
+**Extending ClaudeScope** — to add support for another agent CLI's logs or a custom dashboard panel, see [`docs/EXTENDING.md`](docs/EXTENDING.md): it documents the `src/sources/` adapter contract, the normalized session/message shape, and how analytics fields reach the dashboard (with a copy-paste adapter skeleton).
 
 ## License
 
