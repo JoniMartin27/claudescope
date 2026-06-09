@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ClaudeScope — promo</title>
+    <style>
+      :root {
+        --bg: #0e0f13; --panel: #1a1d26; --panel2: #20242f; --border: #2a2f3c;
+        --text: #e7e9ee; --muted: #9aa3b2; --faint: #6b7280;
+        --accent: #d97757; --accent2: #36c5d0; --accent3: #b18cf0; --green: #4ade80; --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1280px; height: 720px; overflow: hidden; background: #000; }
+      #stage {
+        position: relative; width: 1280px; height: 720px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1100px 700px at 12% -10%, rgba(217,119,87,.14), transparent 60%),
+          radial-gradient(1000px 600px at 100% 0%, rgba(54,197,208,.10), transparent 55%),
+          var(--bg);
+        overflow: hidden;
+      }
+      /* subtle grid */
+      #stage::before {
+        content: ""; position: absolute; inset: 0;
+        background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+        background-size: 44px 44px; mask-image: radial-gradient(circle at 50% 45%, #000 30%, transparent 78%);
+      }
+      .scene {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        opacity: 0; transition: opacity .6s ease; padding: 0 90px;
+      }
+      .scene.in { opacity: 1; }
+
+      /* ---------- intro ---------- */
+      .logo { font-size: 120px; line-height: 1; filter: drop-shadow(0 8px 26px rgba(217,119,87,.5));
+        opacity: 0; transform: scale(.4) rotate(-18deg); }
+      .in .logo { animation: pop .9s cubic-bezier(.2,1.3,.4,1) .1s forwards; }
+      @keyframes pop { to { opacity: 1; transform: scale(1) rotate(0); } }
+      .wordmark { font-size: 86px; font-weight: 800; letter-spacing: -2px; margin-top: 14px;
+        background: linear-gradient(90deg, var(--text) 30%, var(--accent));
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        opacity: 0; transform: translateY(20px); }
+      .in .wordmark { animation: rise .8s ease .5s forwards; }
+      .tagline { font-size: 24px; color: var(--muted); margin-top: 16px; opacity: 0; transform: translateY(14px); }
+      .in .tagline { animation: rise .8s ease .9s forwards; }
+      @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+      /* ---------- headers ---------- */
+      .kicker { font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent);
+        font-weight: 700; opacity: 0; }
+      .in .kicker { animation: rise .6s ease .1s forwards; }
+      .headline { font-size: 46px; font-weight: 750; letter-spacing: -1px; margin: 10px 0 38px; text-align: center;
+        opacity: 0; transform: translateY(16px); }
+      .in .headline { animation: rise .7s ease .25s forwards; }
+
+      /* ---------- stat cards ---------- */
+      .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; width: 100%; max-width: 1080px; }
+      .card { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--border);
+        border-radius: 18px; padding: 26px 24px; position: relative; overflow: hidden;
+        opacity: 0; transform: translateY(34px) scale(.96); }
+      .in .card { animation: cardin .7s cubic-bezier(.2,1,.3,1) forwards; }
+      .in .card:nth-child(1){animation-delay:.45s}.in .card:nth-child(2){animation-delay:.58s}
+      .in .card:nth-child(3){animation-delay:.71s}.in .card:nth-child(4){animation-delay:.84s}
+      .in .card:nth-child(5){animation-delay:.97s}
+      @keyframes cardin { to { opacity: 1; transform: translateY(0) scale(1); } }
+      .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--accent); }
+      .card.c2::before{background:var(--accent2)}.card.c3::before{background:var(--accent3)}
+      .card.c4::before{background:var(--green)}.card.c5::before{background:var(--warn)}
+      .card .k { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+      .card .v { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+      .card .x { font-size: 13px; color: var(--faint); margin-top: 6px; }
+
+      /* ---------- model spend ---------- */
+      .panel { width: 100%; max-width: 980px; background: var(--panel); border: 1px solid var(--border);
+        border-radius: 20px; padding: 34px 40px; }
+      .mrow { margin-bottom: 22px; opacity: 0; transform: translateX(-24px); }
+      .mrow:last-child { margin-bottom: 0; }
+      .in .mrow { animation: slidein .6s ease forwards; }
+      .in .mrow:nth-child(1){animation-delay:.4s}.in .mrow:nth-child(2){animation-delay:.58s}
+      .in .mrow:nth-child(3){animation-delay:.76s}.in .mrow:nth-child(4){animation-delay:.94s}
+      @keyframes slidein { to { opacity: 1; transform: translateX(0); } }
+      .mhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+      .mname { font-size: 21px; font-weight: 600; display: flex; align-items: center; gap: 11px; }
+      .mdot { width: 13px; height: 13px; border-radius: 4px; }
+      .mcost { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .mcost .pct { color: var(--faint); font-weight: 400; font-size: 16px; margin-left: 9px; }
+      .mtrack { height: 13px; background: var(--bg); border-radius: 7px; overflow: hidden; }
+      .mfill { height: 100%; width: 0; border-radius: 7px; }
+      .in .mfill { animation: grow 1.1s cubic-bezier(.2,.8,.2,1) forwards; }
+      .in .mrow:nth-child(1) .mfill{animation-delay:.5s}.in .mrow:nth-child(2) .mfill{animation-delay:.68s}
+      .in .mrow:nth-child(3) .mfill{animation-delay:.86s}.in .mrow:nth-child(4) .mfill{animation-delay:1.04s}
+      @keyframes grow { to { width: var(--w); } }
+      .msub { font-size: 14px; color: var(--faint); margin-top: 7px; }
+
+      /* ---------- search ---------- */
+      .searchwrap { width: 100%; max-width: 880px; }
+      .searchbar { display: flex; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--accent);
+        border-radius: 16px; padding: 20px 26px; font-size: 24px; box-shadow: 0 0 0 4px rgba(217,119,87,.12); }
+      .searchbar .q { color: var(--text); }
+      .caret { display: inline-block; width: 2px; height: 26px; background: var(--accent); margin-left: 1px;
+        animation: blink 1s steps(1) infinite; vertical-align: middle; }
+      @keyframes blink { 50% { opacity: 0; } }
+      .results { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+      .result { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 16px 20px;
+        font-size: 16px; color: var(--muted); opacity: 0; transform: translateY(16px); }
+      .result.show { animation: rise .45s ease forwards; }
+      .rhead { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; font-size: 12.5px; }
+      .tag { font-size: 11.5px; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border); text-transform: uppercase; letter-spacing: .5px; }
+      .tag.user { color: var(--accent2); border-color: rgba(54,197,208,.45); }
+      .tag.assistant { color: var(--accent); border-color: rgba(217,119,87,.45); }
+      .rproj { color: var(--faint); }
+      mark { background: rgba(217,119,87,.4); color: #fff; border-radius: 3px; padding: 0 2px; }
+
+      /* ---------- outro ---------- */
+      .lock { font-size: 30px; opacity: 0; }
+      .in .lock { animation: rise .6s ease .1s forwards; }
+      .obig { font-size: 52px; font-weight: 800; letter-spacing: -1px; text-align: center; margin: 14px 0 26px;
+        opacity: 0; transform: translateY(16px); }
+      .in .obig { animation: rise .7s ease .3s forwards; }
+      .cmd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 30px; color: var(--green);
+        background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 34px;
+        opacity: 0; transform: scale(.92); }
+      .in .cmd { animation: cmdin .7s cubic-bezier(.2,1.2,.3,1) .6s forwards; }
+      @keyframes cmdin { to { opacity: 1; transform: scale(1); } }
+      .repo { margin-top: 24px; color: var(--muted); font-size: 20px; opacity: 0; }
+      .in .repo { animation: rise .6s ease 1s forwards; }
+      .star { margin-top: 8px; color: var(--warn); font-size: 18px; opacity: 0; }
+      .in .star { animation: rise .6s ease 1.25s forwards; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <!-- S1 intro -->
+      <section class="scene" id="s1">
+        <div class="logo">🔭</div>
+        <div class="wordmark">ClaudeScope</div>
+        <div class="tagline">Your Claude Code sessions, finally visible.</div>
+      </section>
+
+      <!-- S2 stats -->
+      <section class="scene" id="s2">
+        <div class="kicker">Where does your Claude Code time go?</div>
+        <div class="headline">Every session, measured.</div>
+        <div class="cards">
+          <div class="card"><div class="k">Sessions</div><div class="v" data-to="94">0</div><div class="x">across 30 days</div></div>
+          <div class="card c2"><div class="k">Messages</div><div class="v" data-to="41100" data-suffix="k" data-div="1000" data-dec="1">0</div><div class="x">prompts + replies</div></div>
+          <div class="card c3"><div class="k">Tokens</div><div class="v" data-to="7.2" data-suffix="B" data-dec="1">0</div><div class="x">across the wire</div></div>
+          <div class="card c4"><div class="k">Est. API cost</div><div class="v" data-prefix="$" data-to="6355" data-comma="1">0</div><div class="x">at list rates</div></div>
+          <div class="card c5"><div class="k">Tool calls</div><div class="v" data-to="13400" data-suffix="k" data-div="1000" data-dec="1">0</div><div class="x">84 distinct tools</div></div>
+        </div>
+      </section>
+
+      <!-- S3 model spend -->
+      <section class="scene" id="s3">
+        <div class="kicker">Which models cost you what</div>
+        <div class="headline">Model spend, broken down.</div>
+        <div class="panel">
+          <div class="mrow">
+            <div class="mhead"><span class="mname"><span class="mdot" style="background:#d97757"></span>opus-4-8</span><span class="mcost">$4,386<span class="pct">69%</span></span></div>
+            <div class="mtrack"><div class="mfill" style="--w:100%;background:#d97757"></div></div>
+            <div class="msub">4.8B tokens · 15.4k replies · 40 sessions</div>
+          </div>
+          <div class="mrow">
+            <div class="mhead"><span class="mname"><span class="mdot" style="background:#36c5d0"></span>opus-4-7</span><span class="mcost">$1,724<span class="pct">27%</span></span></div>
+            <div class="mtrack"><div class="mfill" style="--w:39%;background:#36c5d0"></div></div>
+            <div class="msub">2.0B tokens · 6.6k replies · 40 sessions</div>
+          </div>
+          <div class="mrow">
+            <div class="mhead"><span class="mname"><span class="mdot" style="background:#b18cf0"></span>sonnet-4-6</span><span class="mcost">$243<span class="pct">4%</span></span></div>
+            <div class="mtrack"><div class="mfill" style="--w:8%;background:#b18cf0"></div></div>
+            <div class="msub">417M tokens · 4.4k replies · 17 sessions</div>
+          </div>
+          <div class="mrow">
+            <div class="mhead"><span class="mname"><span class="mdot" style="background:#4ade80"></span>haiku-4-5</span><span class="mcost">$2<span class="pct">0%</span></span></div>
+            <div class="mtrack"><div class="mfill" style="--w:2%;background:#4ade80"></div></div>
+            <div class="msub">9M tokens · 101 replies · 3 sessions</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S4 search -->
+      <section class="scene" id="s4">
+        <div class="kicker">Find any conversation, instantly</div>
+        <div class="headline">Search everything you ever asked.</div>
+        <div class="searchwrap">
+          <div class="searchbar">🔎 <span class="q" id="typed"></span><span class="caret"></span></div>
+          <div class="results" id="results">
+            <div class="result"><div class="rhead"><span class="tag user">user</span><span class="rproj">inferbench</span><span class="rproj">Jun 3, 2026</span></div><div>add a <mark>postgres</mark> <mark>driver</mark> to the storage layer with pg-mem fallback</div></div>
+            <div class="result"><div class="rhead"><span class="tag assistant">assistant</span><span class="rproj">lookspan</span><span class="rproj">Jun 8, 2026</span></div><div>the <mark>postgres</mark> <mark>driver</mark> now runs in-process via pg-mem; remote PG is a follow-up</div></div>
+            <div class="result"><div class="rhead"><span class="tag user">user</span><span class="rproj">regenta-app</span><span class="rproj">May 29, 2026</span></div><div>swap the sqlite layer for a real <mark>postgres</mark> <mark>driver</mark> behind an env flag</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S5 outro -->
+      <section class="scene" id="s5">
+        <div class="lock">🔒 100% local · zero network requests · zero dependencies</div>
+        <div class="obig">It's all on your machine.</div>
+        <div class="cmd">$ npx claudescope</div>
+        <div class="repo">github.com/JoniMartin27/claudescope</div>
+        <div class="star">★ Star it if it shows you something surprising</div>
+      </section>
+    </div>
+
+    <script>
+      const scenes = [
+        { id: 's1', at: 200, dur: 3000 },
+        { id: 's2', at: 3400, dur: 4600 },
+        { id: 's3', at: 8200, dur: 4400 },
+        { id: 's4', at: 12800, dur: 4000 },
+        { id: 's5', at: 17000, dur: 3500 },
+      ];
+      function fmtNum(v, o) {
+        let n = v;
+        if (o.div) n = v / o.div;
+        let s;
+        if (o.comma) s = Math.round(n).toLocaleString('en-US');
+        else if (o.dec) s = n.toFixed(o.dec);
+        else s = String(Math.round(n));
+        return (o.prefix || '') + s + (o.suffix || '');
+      }
+      function countUp(el) {
+        const to = parseFloat(el.dataset.to);
+        const o = { div: +el.dataset.div || 0, dec: +el.dataset.dec || 0, comma: +el.dataset.comma || 0,
+          prefix: el.dataset.prefix || '', suffix: el.dataset.suffix || '' };
+        const start = performance.now(), D = 1100;
+        function tick(t) {
+          const p = Math.min(1, (t - start) / D);
+          const e = 1 - Math.pow(1 - p, 3);
+          el.textContent = fmtNum(to * e, o);
+          if (p < 1) requestAnimationFrame(tick); else el.textContent = fmtNum(to, o);
+        }
+        requestAnimationFrame(tick);
+      }
+      function typeText(el, text, cps, done) {
+        let i = 0;
+        const step = () => {
+          el.textContent = text.slice(0, i);
+          if (i++ <= text.length) setTimeout(step, 1000 / cps); else if (done) done();
+        };
+        step();
+      }
+      function show(id) {
+        const s = document.getElementById(id);
+        s.classList.add('in');
+        if (id === 's2') s.querySelectorAll('.v').forEach((el, i) => setTimeout(() => countUp(el), 500 + i * 130));
+        if (id === 's4') {
+          setTimeout(() => typeText(document.getElementById('typed'), 'postgres driver', 13), 500);
+          const rs = document.querySelectorAll('#results .result');
+          rs.forEach((r, i) => setTimeout(() => r.classList.add('show'), 1700 + i * 260));
+        }
+      }
+      function hide(id) { document.getElementById(id).classList.remove('in'); }
+      scenes.forEach((sc) => {
+        setTimeout(() => show(sc.id), sc.at);
+        setTimeout(() => hide(sc.id), sc.at + sc.dur);
+      });
+      window.__promoDone = false;
+      setTimeout(() => { window.__promoDone = true; }, 20800);
+    </script>
+  </body>
+</html>

@@ -25,11 +25,11 @@
 
         <section class="search-block">
           <div class="search-wrap">
-            <span class="search-icon">🔎</span>
-            <input id="search" type="search" placeholder="Search across every prompt, reply and tool call…" autocomplete="off" />
-            <span class="search-hint" id="searchHint"></span>
+            <span class="search-icon" aria-hidden="true">🔎</span>
+            <input id="search" type="search" aria-label="Search your Claude Code sessions" placeholder="Search across every prompt, reply and tool call…" autocomplete="off" />
+            <span class="search-hint" id="searchHint" role="status" aria-live="polite"></span>
           </div>
-          <div id="searchResults" class="search-results"></div>
+          <div id="searchResults" class="search-results" role="region" aria-label="Search results" aria-live="polite"></div>
         </section>
 
         <div class="grid">
@@ -49,7 +49,7 @@
           </section>
 
           <section class="panel">
-            <h2>Models</h2>
+            <h2>Model spend <span class="sub">(tokens &amp; est. cost per model)</span></h2>
             <div id="models" class="bars"></div>
           </section>
 

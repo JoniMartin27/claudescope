@@ -35,8 +35,14 @@ function collectToolNames(content, into) {
   }
 }
 
-const MAX_TEXT = 2000; // cap per-message stored text to bound memory
+const SEARCH_MAX = 8000; // chars of each message indexed for full-text search
 const SNIPPET = 280;
+
+function basename(p) {
+  if (!p) return null;
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || null;
+}
 
 function emptyUsage() {
   return { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
@@ -74,10 +80,12 @@ export async function parseFile(filePath, encodedProject) {
         userMsgs: 0,
         assistantMsgs: 0,
         models: {},
+        modelUsage: {}, // model -> { messages, usage{}, cost }
         tools: {},
         usage: emptyUsage(),
         cost: 0,
         title: null,
+        heat: {}, // (weekday*24+hour) -> assistant-message count, by each message's own ts
       });
     }
     return sessionsById.get(id);
@@ -106,7 +114,14 @@ export async function parseFile(filePath, encodedProject) {
     }
     if (obj.version) s.version = obj.version;
     if (obj.gitBranch) s.gitBranch = obj.gitBranch;
-    if (obj.cwd) s.cwd = obj.cwd;
+    if (obj.cwd) {
+      s.cwd = obj.cwd;
+      // The session's real cwd is authoritative — it recovers hyphens and the
+      // true last segment that the encoded folder name can't (e.g. "dynafeet-web").
+      s.projectPath = obj.cwd;
+      const b = basename(obj.cwd);
+      if (b) s.projectLabel = b;
+    }
     if (obj.userType) s.userType = obj.userType;
     if (obj.entrypoint) s.entrypoint = obj.entrypoint;
 
@@ -127,22 +142,45 @@ export async function parseFile(filePath, encodedProject) {
       }
     } else if (type === 'assistant') {
       s.assistantMsgs++;
-      if (msg.model && msg.model !== '<synthetic>') s.models[msg.model] = (s.models[msg.model] || 0) + 1;
+      const realModel = msg.model && msg.model !== '<synthetic>' ? msg.model : null;
+      if (realModel) s.models[realModel] = (s.models[realModel] || 0) + 1;
       collectToolNames(content, s.tools);
+      // Heatmap: attribute THIS reply to its own hour (not the session start),
+      // and never invent activity for sessions with no assistant turns.
+      if (ts) {
+        const dt = new Date(ts);
+        if (!isNaN(dt)) {
+          const bucket = dt.getDay() * 24 + dt.getHours();
+          s.heat[bucket] = (s.heat[bucket] || 0) + 1;
+        }
+      }
       if (msg.usage) {
         addUsage(s.usage, msg.usage);
-        s.cost += costForUsage(msg.model, msg.usage);
+        const c = costForUsage(msg.model, msg.usage);
+        s.cost += c;
+        if (realModel) {
+          if (!s.modelUsage[realModel]) {
+            s.modelUsage[realModel] = { messages: 0, usage: emptyUsage(), cost: 0 };
+          }
+          const mu = s.modelUsage[realModel];
+          mu.messages++;
+          addUsage(mu.usage, msg.usage);
+          mu.cost += c;
+        }
       }
     }
 
     if (text.trim()) {
+      // Store a lowercased, generously-capped haystack so search finds matches
+      // well past the first screenful, and never re-lowercases per query.
+      const lc = (text.length > SEARCH_MAX ? text.slice(0, SEARCH_MAX) : text).toLowerCase();
       messages.push({
         sessionId: sid,
         project: encodedProject,
         projectLabel: s.projectLabel,
         ts,
         role: type,
-        text: text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) : text,
+        lc,
         snippet: text.replace(/\s+/g, ' ').slice(0, SNIPPET),
       });
     }

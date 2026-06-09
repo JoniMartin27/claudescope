@@ -66,12 +66,22 @@ function openBrowser(url) {
 async function main() {
   if (has('--help') || has('-h')) return help();
 
-  const claudeDir = opt('--dir', null) || findClaudeDir();
+  const explicitDir = opt('--dir', null);
+  const claudeDir = explicitDir || findClaudeDir();
   if (!claudeDir) {
     console.error(
       `${C.yellow}Could not find a Claude Code data directory.${C.reset}\n` +
         `Looked for a "projects" folder under ~/.claude (and CLAUDE_CONFIG_DIR).\n` +
         `Pass one explicitly with: claudescope --dir <path-to-.claude>`
+    );
+    process.exit(1);
+  }
+  // findClaudeDir() already verified projects/, but an explicit --dir bypasses
+  // that — validate it here so we fail with a friendly message, not an ENOENT.
+  if (explicitDir && !fs.existsSync(path.join(claudeDir, 'projects'))) {
+    console.error(
+      `${C.yellow}No "projects" folder found under ${claudeDir}.${C.reset}\n` +
+        `Point --dir at your .claude directory (the one that contains a "projects" folder).`
     );
     process.exit(1);
   }
@@ -84,6 +94,10 @@ async function main() {
 
   banner();
   const port = parseInt(opt('--port', '4317'), 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error(`${C.yellow}Invalid --port "${opt('--port', '')}". Use a number between 1 and 65535.${C.reset}`);
+    process.exit(1);
+  }
   const { server } = await createServer(claudeDir, { onLog: (m) => console.log(`   ${C.dim}${m}${C.reset}`) });
 
   server.listen(port, '127.0.0.1', () => {

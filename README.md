@@ -19,6 +19,12 @@ npx claudescope
 
 *That's it. No install, no config, no account, no network. Your browser opens a dashboard built entirely from the transcripts already on your disk.*
 
+<br/>
+
+<img src="docs/promo.gif" alt="ClaudeScope walkthrough — stat cards, model spend breakdown, and full-text search" width="100%" />
+
+<sub>▶ <a href="docs/promo.mp4">Watch the 20-second tour (MP4)</a></sub>
+
 </div>
 
 ---
@@ -62,9 +68,12 @@ npx claudescope --json > usage.json
 
 # Point at a non-default location
 npx claudescope --dir /path/to/.claude
+
+# Show all flags
+npx claudescope --help     # or -h
 ```
 
-ClaudeScope auto-detects your Claude Code data directory (it honors `CLAUDE_CONFIG_DIR`, then falls back to `~/.claude`). It reads the transcripts, builds the dashboard in memory, and serves it on `127.0.0.1`.
+By default the dashboard opens at **http://127.0.0.1:4317** (override with `--port`). ClaudeScope auto-detects your Claude Code data directory — it honors `CLAUDE_CONFIG_DIR`, then falls back to `~/.claude`, then `$XDG_CONFIG_HOME/claude` and `~/.config/claude`. It reads the transcripts, builds the dashboard in memory, and serves it on `127.0.0.1` only.
 
 ## 🔒 Privacy first
 

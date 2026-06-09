@@ -25,7 +25,10 @@ function serveStatic(res, urlPath) {
   let rel = urlPath === '/' ? '/index.html' : urlPath;
   rel = rel.split('?')[0];
   const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  // Boundary-aware check: a bare startsWith would also accept a sibling dir
+  // sharing the prefix (e.g. "public-secret/"). Require an exact match or a
+  // real path separator after the public root.
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) {
     return send(res, 403, 'Forbidden', 'text/plain');
   }
   fs.readFile(filePath, (err, data) => {

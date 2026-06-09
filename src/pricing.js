@@ -12,10 +12,17 @@
  */
 
 // Base list prices (input / output) per 1M tokens.
+// Source: Anthropic published pricing (Claude API skill, cached 2026-05-26).
+//   Opus 4.x   → $5 / $25
+//   Sonnet 4.x → $3 / $15
+//   Haiku 4.5  → $1 / $5
+// Older families kept for completeness so historic transcripts still price.
 const PRICES = [
-  { match: /opus/i, input: 15, output: 75 },
+  { match: /opus-4/i, input: 5, output: 25 },
+  { match: /opus-3|claude-3-opus/i, input: 15, output: 75 },
+  { match: /opus/i, input: 5, output: 25 },
   { match: /sonnet/i, input: 3, output: 15 },
-  { match: /haiku-4/i, input: 0.8, output: 4 },
+  { match: /haiku-4/i, input: 1, output: 5 },
   { match: /haiku/i, input: 0.25, output: 1.25 },
 ];
 

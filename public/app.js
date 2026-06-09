@@ -88,16 +88,29 @@ function renderProjects(a) {
   );
 }
 
+const MODEL_COLORS = ['#d97757', '#36c5d0', '#b18cf0', '#4ade80', '#fbbf24', '#f472b6'];
+function modelShort(id) {
+  return id.replace('claude-', '').replace(/-\d{8}$/, '');
+}
 function renderModels(a) {
-  bars(
-    'models',
-    a.byModel.slice(0, 8).map((m) => ({
-      label: m.model.replace('claude-', ''),
-      value: m.messages,
-      display: fmt.num(m.messages),
-    })),
-    { color2: true }
-  );
+  const c = $('#models');
+  c.innerHTML = '';
+  const rows = a.byModel.slice(0, 8);
+  const totalCost = rows.reduce((s, m) => s + m.cost, 0) || 1;
+  const maxCost = Math.max(...rows.map((m) => m.cost), 0.0001);
+  rows.forEach((m, i) => {
+    const color = MODEL_COLORS[i % MODEL_COLORS.length];
+    const pct = Math.round((m.cost / totalCost) * 100);
+    const row = el('div', 'model-row');
+    row.innerHTML =
+      `<div class="model-head">` +
+      `<span class="model-name"><span class="dot" style="background:${color}"></span>${escapeHtml(modelShort(m.model))}</span>` +
+      `<span class="model-cost">${fmt.money(m.cost)}<span class="model-pct">${pct}%</span></span>` +
+      `</div>` +
+      `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, (m.cost / maxCost) * 100)}%;background:${color}"></div></div>` +
+      `<div class="model-sub">${fmt.num(m.tokens)} tokens · ${fmt.num(m.messages)} replies · ${fmt.num(m.sessions)} sessions</div>`;
+    c.appendChild(row);
+  });
 }
 
 function renderTools(a) {
@@ -126,9 +139,10 @@ function renderTokenMix(a) {
       stroke-dasharray="${len} ${CIRC - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${C} ${C})" />`;
     offset += len;
   }
-  const svg = `<svg width="120" height="120" viewBox="0 0 120 120">${circles}
-    <text x="${C}" y="${C - 2}" text-anchor="middle" fill="#e7e9ee" font-size="17" font-weight="700">${fmt.num(total)}</text>
-    <text x="${C}" y="${C + 14}" text-anchor="middle" fill="#6b7280" font-size="9">tokens</text></svg>`;
+  const aria = segs.map((s) => `${s.label} ${Math.round((s.val / total) * 100)}%`).join(', ');
+  const svg = `<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Token mix: ${aria}"><title>Token mix: ${aria}</title>${circles}
+    <text x="${C}" y="${C - 2}" text-anchor="middle" fill="#e7e9ee" font-size="17" font-weight="700" aria-hidden="true">${fmt.num(total)}</text>
+    <text x="${C}" y="${C + 14}" text-anchor="middle" fill="#6b7280" font-size="9" aria-hidden="true">tokens</text></svg>`;
   const legend = segs
     .map(
       (s) =>
@@ -152,7 +166,9 @@ function renderTimeline(a) {
   for (const d of slice) {
     const bar = el('div', 'tl-bar');
     bar.style.height = Math.max(2, (d.cost / max) * 100) + '%';
-    bar.dataset.tip = `${d.day} · ${fmt.money(d.cost)} · ${d.sessions} sessions`;
+    const tip = `${d.day} · ${fmt.money(d.cost)} · ${d.sessions} sessions`;
+    bar.dataset.tip = tip;
+    bar.title = tip; // also available without hover-CSS (touch / a11y)
     c.appendChild(bar);
   }
   const axis = el('div', 'tl-axis');
@@ -162,11 +178,34 @@ function renderTimeline(a) {
 }
 
 const DAYNAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYFULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function fmtHour(h) {
+  const ampm = h < 12 ? 'am' : 'pm';
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr}${ampm}`;
+}
+let hmTooltip;
+function getHmTooltip() {
+  if (!hmTooltip) {
+    hmTooltip = el('div', 'hm-tooltip');
+    document.body.appendChild(hmTooltip);
+  }
+  return hmTooltip;
+}
 function renderHeatmap(a) {
   const c = $('#heatmap');
   c.innerHTML = '';
-  let max = 1;
-  for (const row of a.heatmap) for (const v of row) if (v > max) max = v;
+  let max = 1, peakD = 0, peakH = 0;
+  for (let d = 0; d < 7; d++)
+    for (let h = 0; h < 24; h++) {
+      const v = a.heatmap[d][h];
+      if (v > max) { max = v; peakD = d; peakH = h; }
+    }
+  c.setAttribute('role', 'img');
+  c.setAttribute(
+    'aria-label',
+    max > 1 ? `Activity heatmap by weekday and hour. Busiest: ${DAYFULL[peakD]} around ${fmtHour(peakH)}.` : 'Activity heatmap by weekday and hour.'
+  );
   // header row
   c.appendChild(el('div', 'hm-lbl', ''));
   for (let h = 0; h < 24; h++) c.appendChild(el('div', 'hm-hour', h % 3 === 0 ? h : ''));
@@ -175,14 +214,43 @@ function renderHeatmap(a) {
     for (let h = 0; h < 24; h++) {
       const v = a.heatmap[d][h];
       const cell = el('div', 'hm-cell');
+      cell.dataset.d = d;
+      cell.dataset.h = h;
+      cell.dataset.v = v;
       if (v > 0) {
         const alpha = 0.15 + 0.85 * (v / max);
         cell.style.background = `rgba(217,119,87,${alpha.toFixed(2)})`;
-        cell.title = `${DAYNAMES[d]} ${h}:00 — ${v}`;
       }
       c.appendChild(cell);
     }
   }
+
+  // single delegated tooltip for the whole grid
+  const tip = getHmTooltip();
+  const show = (e) => {
+    const cell = e.target.closest('.hm-cell');
+    if (!cell) {
+      tip.classList.remove('show');
+      return;
+    }
+    const d = +cell.dataset.d;
+    const h = +cell.dataset.h;
+    const v = +cell.dataset.v;
+    tip.innerHTML =
+      `<div class="hm-tip-day">${DAYFULL[d]} · ${fmtHour(h)}–${fmtHour((h + 1) % 24)}</div>` +
+      `<div class="hm-tip-val">${v === 0 ? 'No activity' : `<b>${fmt.num(v)}</b> messages`}</div>`;
+    tip.classList.add('show');
+    const pad = 12;
+    let x = e.clientX + pad;
+    let y = e.clientY + pad;
+    const r = tip.getBoundingClientRect();
+    if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - pad;
+    if (y + r.height > window.innerHeight - 8) y = e.clientY - r.height - pad;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+  c.addEventListener('mousemove', show);
+  c.addEventListener('mouseleave', () => tip.classList.remove('show'));
 }
 
 function renderSessions(a) {
@@ -192,12 +260,14 @@ function renderSessions(a) {
     const row = el('div', 'session');
     const left = el('div');
     left.appendChild(el('div', 's-title', escapeHtml(s.title)));
-    const tools = s.topTools.map((t) => `<span class="pill">${t[0]} ${t[1]}</span>`).join(' ');
+    const tools = s.topTools
+      .map((t) => `<span class="pill">${escapeHtml(t[0])} ${escapeHtml(String(t[1]))}</span>`)
+      .join(' ');
     left.appendChild(
       el(
         'div',
         's-sub',
-        `<span>${s.project}</span><span>${fmt.date(s.firstTs)}</span><span>${fmt.num(s.tokens)} tok</span>${tools}`
+        `<span>${escapeHtml(s.project)}</span><span>${fmt.date(s.firstTs)}</span><span>${fmt.num(s.tokens)} tok</span>${tools}`
       )
     );
     row.appendChild(left);
@@ -232,13 +302,18 @@ async function runSearch(q) {
   $('#searchHint').textContent = `${res.length}${res.length === 100 ? '+' : ''} matches`;
   const c = $('#searchResults');
   c.innerHTML = '';
+  if (res.length === 0) {
+    c.appendChild(el('div', 'result empty', `No matches for "${escapeHtml(q)}"`));
+    return;
+  }
   for (const r of res.slice(0, 40)) {
     const row = el('div', 'result');
+    const role = r.role === 'assistant' ? 'assistant' : 'user';
     row.appendChild(
       el(
         'div',
         'r-head',
-        `<span class="tag ${r.role}">${r.role}</span><span class="r-proj">${r.project}</span><span class="r-proj">${fmt.date(r.ts)}</span>`
+        `<span class="tag ${role}">${role}</span><span class="r-proj">${escapeHtml(r.project)}</span><span class="r-proj">${fmt.date(r.ts)}</span>`
       )
     );
     row.appendChild(el('div', 'r-text', highlight(escapeHtml(r.snippet), q)));
@@ -246,21 +321,38 @@ async function runSearch(q) {
   }
 }
 
-function highlight(text, q) {
+function highlight(escapedText, q) {
+  let text = escapedText;
   for (const term of q.split(/\s+/)) {
     if (term.length < 2) continue;
-    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
-    text = text.replace(re, '<mark style="background:rgba(217,119,87,.35);color:#fff;border-radius:3px">$1</mark>');
+    // Escape the term the SAME way the haystack was escaped, so terms with
+    // &, <, >, " or ' match the entities present in the escaped snippet.
+    const safe = escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(' + safe + ')', 'ig');
+    text = text.replace(re, '<mark>$1</mark>');
   }
   return text;
 }
 
 // ---------- boot ----------
+function renderEmptyState() {
+  document.querySelector('main').innerHTML =
+    `<div class="panel empty-first"><div class="empty-logo">🔭</div>` +
+    `<h2>No Claude Code sessions found yet</h2>` +
+    `<p>ClaudeScope didn't find any transcripts under your <code>~/.claude/projects</code> folder. ` +
+    `Run a Claude Code session, then refresh this page — your analytics will appear here.</p></div>`;
+}
+
 async function boot() {
   const [a, meta] = await Promise.all([
     fetch('/api/analytics').then((r) => r.json()),
     fetch('/api/meta').then((r) => r.json()),
   ]);
+  if (!a.totals || a.totals.sessions === 0) {
+    renderMeta(a, meta);
+    renderEmptyState();
+    return;
+  }
   renderMeta(a, meta);
   renderCards(a);
   renderTokenMix(a);
@@ -274,6 +366,7 @@ async function boot() {
 }
 
 boot().catch((e) => {
-  document.querySelector('main').innerHTML =
-    `<div class="panel"><h2>Couldn't load data</h2><p style="color:#9aa3b2">${e.message}</p></div>`;
+  const main = document.querySelector('main');
+  main.setAttribute('role', 'alert');
+  main.innerHTML = `<div class="panel"><h2>Couldn't load data</h2><p class="muted">${escapeHtml(e.message)}</p></div>`;
 });

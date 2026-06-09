@@ -52,9 +52,13 @@ export function buildAnalytics(sessions) {
     if (s.firstTs && (!totals.firstTs || s.firstTs < totals.firstTs)) totals.firstTs = s.firstTs;
     if (s.lastTs && (!totals.lastTs || s.lastTs > totals.lastTs)) totals.lastTs = s.lastTs;
 
-    // by project
-    if (!byProject.has(s.projectLabel)) {
-      byProject.set(s.projectLabel, {
+    // by project — key on the full project PATH (the real cwd when known),
+    // not the display label. Two projects that merely share a last folder
+    // segment (work/foo/api vs personal/bar/api) stay separate, while
+    // different encoded folders that resolve to the same directory merge.
+    const projectKey = s.projectPath || s.project || s.projectLabel;
+    if (!byProject.has(projectKey)) {
+      byProject.set(projectKey, {
         label: s.projectLabel,
         path: s.projectPath,
         sessions: 0,
@@ -63,18 +67,25 @@ export function buildAnalytics(sessions) {
         usage: newUsage(),
       });
     }
-    const p = byProject.get(s.projectLabel);
+    const p = byProject.get(projectKey);
     p.sessions++;
     p.messages += s.messageCount;
     p.cost += s.cost;
     mergeUsage(p.usage, s.usage);
 
-    // by model
+    // by model (messages + sessions + per-model tokens & cost)
     for (const [model, count] of Object.entries(s.models)) {
-      if (!byModel.has(model)) byModel.set(model, { model, messages: 0, sessions: 0 });
+      if (!byModel.has(model)) {
+        byModel.set(model, { model, messages: 0, sessions: 0, usage: newUsage(), cost: 0 });
+      }
       const m = byModel.get(model);
       m.messages += count;
       m.sessions++;
+      const mu = s.modelUsage[model];
+      if (mu) {
+        mergeUsage(m.usage, mu.usage);
+        m.cost += mu.cost;
+      }
     }
 
     // by tool
@@ -96,14 +107,11 @@ export function buildAnalytics(sessions) {
       d.cost += s.cost;
     }
 
-    // heatmap from firstTs (cheap, per-session)
-    if (s.firstTs) {
-      const dt = new Date(s.firstTs);
-      if (!isNaN(dt)) {
-        const wd = dt.getDay();
-        const hr = dt.getHours();
-        heatmap[wd][hr] += s.assistantMsgs || 1;
-      }
+    // heatmap: sum each reply at its OWN weekday×hour (built in the parser),
+    // so a long session spreads across the hours it actually spanned.
+    for (const [bucket, count] of Object.entries(s.heat)) {
+      const b = +bucket;
+      heatmap[Math.floor(b / 24)][b % 24] += count;
     }
   }
 
@@ -131,7 +139,9 @@ export function buildAnalytics(sessions) {
     generatedAt: new Date().toISOString(),
     totals: { ...totals, tokens: usageTokens(totals.usage) },
     byProject: [...byProject.values()].map((p) => ({ ...p, tokens: usageTokens(p.usage) })).sort(sortByCost),
-    byModel: [...byModel.values()].sort((a, b) => b.messages - a.messages),
+    byModel: [...byModel.values()]
+      .map((m) => ({ ...m, tokens: usageTokens(m.usage) }))
+      .sort((a, b) => b.cost - a.cost),
     byDay: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)),
     byTool: [...byTool.entries()].map(([tool, count]) => ({ tool, count })).sort((a, b) => b.count - a.count),
     byVersion: [...byVersion.entries()].map(([version, sessions]) => ({ version, sessions })).sort((a, b) => b.sessions - a.sessions),
@@ -147,7 +157,7 @@ export function search(messages, query, limit = 100) {
   const terms = q.split(/\s+/);
   const results = [];
   for (const m of messages) {
-    const hay = m.text.toLowerCase();
+    const hay = m.lc; // already lowercased at parse time
     if (terms.every((t) => hay.includes(t))) {
       results.push({
         sessionId: m.sessionId,
