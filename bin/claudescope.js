@@ -336,6 +336,7 @@ async function main() {
   // Clean shutdown on Ctrl+C / termination.
   const shutdown = () => {
     console.log(`\n   ${C.dim}Shutting down. Bye 🔭${C.reset}`);
+    console.log(`   ${C.dim}Useful? ⭐ ${C.reset}${C.cyan}https://github.com/JoniMartin27/claudescope${C.reset}${C.dim} — or report a bug there.${C.reset}`);
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 500).unref();
   };

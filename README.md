@@ -25,6 +25,10 @@ npx claudescope-cli
 
 <sub>▶ <a href="docs/promo.mp4">Watch the 20-second tour (MP4)</a></sub>
 
+<br/>
+
+<sub>⭐ <b>Useful? <a href="https://github.com/JoniMartin27/claudescope">Star it</a></b> — it's the fastest way to help. Found a bug or want a feature? <a href="https://github.com/JoniMartin27/claudescope/issues">Open an issue</a>.</sub>
+
 </div>
 
 ---
