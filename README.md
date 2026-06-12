@@ -146,6 +146,52 @@ per session, so a future UI can break the combined view down by source.
 Both flags are **100% local** — like everything else in ClaudeScope, they make
 zero network requests.
 
+### Audit export (aggregate, verifiable)
+
+Need a record for compliance, an expense log, or a data-portability request?
+ClaudeScope exports an **aggregate audit artifact** — a CSV and a self-contained
+HTML report — that summarizes your usage **without exposing a single prompt or
+transcript body**.
+
+```bash
+# CSV of per-project aggregates → stdout (also prints the sha256 to stderr)
+claudescope --csv
+
+# …or write it to disk (UTF-8 with BOM, opens cleanly in Excel/Sheets)
+claudescope --csv audit.csv
+
+# Just the integrity hash, on its own line:
+claudescope --csv-sha256
+
+# Self-contained HTML report (hand-drawn SVG charts, no JS, no CDN, print-to-PDF):
+claudescope --report audit.html
+```
+
+The CSV has one row per project with `project, sessions, inputTokens,
+outputTokens, totalTokens, costUsd, firstSeen, lastSeen`.
+
+- **Aggregate-only — GDPR data minimization by design.** It contains *counts and
+  totals*, never the text you typed. Raw prompts/transcripts remain behind the
+  explicit, opt-in `--dump-sessions` flag and never appear in the audit export.
+- **100% local.** Like everything else, zero network requests — the artifact is
+  produced entirely on your machine and never uploaded.
+- **Injection-hardened (CWE-1236 / formula injection).** Any string field that
+  would otherwise be interpreted as a spreadsheet *formula* (begins with
+  `= + - @`, TAB or CR — e.g. a maliciously-named project folder) is neutralized
+  with a leading apostrophe so opening the CSV can't execute anything. Numbers
+  are never altered.
+- **Verifiable by hash.** The export is RFC 4180 with CRLF line endings and a
+  UTF-8 BOM. `--report` embeds the **sha256 of the exact CSV bytes** in its
+  provenance block, and `--csv-sha256` prints that same hash — so a reviewer can
+  re-export and confirm the figures in the HTML match the machine-readable data.
+
+The HTML report leads with a **provenance block** (generation time in ISO 8601
+UTC, the scope/`--dir` used, session count, tool + version, and the CSV
+sha256), then summary cards, SVG charts (cost/tokens per day, cost per project,
+cost per model), and a per-project table — all in a single offline file with no
+scripts and no external resources. It writes a file and exits; it never opens a
+browser or starts a server.
+
 ## 🔒 Privacy first
 
 This is the whole point:

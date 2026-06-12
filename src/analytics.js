@@ -100,6 +100,8 @@ export function buildAnalytics(sessions) {
         messages: 0,
         cost: 0,
         usage: newUsage(),
+        firstTs: null,
+        lastTs: null,
       });
     }
     const p = byProject.get(projectKey);
@@ -107,6 +109,10 @@ export function buildAnalytics(sessions) {
     p.messages += s.messageCount;
     p.cost += s.cost;
     mergeUsage(p.usage, s.usage);
+    // Per-project activity window (min first / max last across its sessions),
+    // used by the aggregate audit export's firstSeen/lastSeen columns.
+    if (s.firstTs && (!p.firstTs || s.firstTs < p.firstTs)) p.firstTs = s.firstTs;
+    if (s.lastTs && (!p.lastTs || s.lastTs > p.lastTs)) p.lastTs = s.lastTs;
 
     // by source (which agent CLI the session came from). Defaults to
     // claude-code so legacy parses with no source tag still bucket correctly.
