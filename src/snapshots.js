@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { stripBom } from './bom.js';
 
 /**
  * Local-only daily snapshot store. This is the ONLY persisted state in
@@ -31,7 +32,7 @@ function todayKey(now = new Date()) {
 export function readSnapshots(dir) {
   try {
     const raw = fs.readFileSync(snapshotPath(dir), 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripBom(raw));
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

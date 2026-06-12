@@ -85,7 +85,7 @@ test('parseFile extracts sessions, tools, usage and tolerates broken lines', asy
   assert.ok(s.title.startsWith('Help me fix'));
   assert.ok(s.cost > 0);
   assert.ok(messages.length >= 3);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('parseAll + buildAnalytics + search end to end', async () => {
@@ -100,5 +100,5 @@ test('parseAll + buildAnalytics + search end to end', async () => {
   assert.ok(hits.results.length >= 1);
   assert.equal(hits.results[0].role, 'user');
   assert.equal(search(messages, 'zzz-no-match').results.length, 0);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });

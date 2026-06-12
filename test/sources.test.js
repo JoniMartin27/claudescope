@@ -41,7 +41,7 @@ test('claude-code adapter output equals the raw parser (plus a source tag)', asy
   assert.deepEqual(aRest, rRest);
   assert.equal(viaAdapter.messages.length, raw.messages.length);
   for (const m of viaAdapter.messages) assert.equal(m.source, 'claude-code');
-  fs.rmSync(path.dirname(path.dirname(file)), { recursive: true, force: true });
+  fs.rmSync(path.dirname(path.dirname(file)), { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 // ---- a synthetic NON-claude source, written as a custom adapter ----
@@ -109,7 +109,7 @@ test('a synthetic non-claude adapter normalizes + tags source; analytics gains b
   assert.equal(hit.total, 1);
   assert.equal(hit.results[0].source, 'synthcli');
   assert.equal(search(messages, 'widgets', { source: 'other' }).total, 0);
-  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('parseAllSources stays Claude-Code-only behavior on a claude fixture and tags source', async () => {
@@ -139,8 +139,8 @@ test('parseAllSources stays Claude-Code-only behavior on a claude fixture and ta
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
-    fs.rmSync(empty, { recursive: true, force: true });
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(empty, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -166,5 +166,5 @@ test('adapters tolerate a missing/garbage file without throwing', async () => {
     assert.ok(Array.isArray(r.sessions) && Array.isArray(r.messages));
     assert.equal(r.sessions.length, 0);
   }
-  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });

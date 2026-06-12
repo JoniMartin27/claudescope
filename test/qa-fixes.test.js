@@ -28,7 +28,7 @@ test('distinct projects that share a last path segment do NOT merge', async () =
   const a = buildAnalytics(sessions);
   const apis = a.byProject.filter((p) => p.label === 'api');
   assert.equal(apis.length, 2, 'two distinct "api" projects must remain separate rows');
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('cwd recovers a hyphenated folder label that the encoded name would split', async () => {
@@ -39,7 +39,7 @@ test('cwd recovers a hyphenated folder label that the encoded name would split',
   ]);
   const { sessions } = await parseAll(dir);
   assert.equal(sessions[0].projectLabel, 'dynafeet-web');
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('search finds terms well beyond the first 2000 characters', async () => {
@@ -51,7 +51,7 @@ test('search finds terms well beyond the first 2000 characters', async () => {
   ]);
   const { messages } = await parseAll(dir);
   assert.equal(search(messages, 'needleword').results.length, 1, 'must match a term ~3000 chars in');
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('parseAll returns an empty result (no throw) when the projects root is missing or a file', async () => {
@@ -65,7 +65,7 @@ test('parseAll returns an empty result (no throw) when the projects root is miss
   fs.writeFileSync(path.join(dir, 'projects'), 'not a dir');
   const r2 = await parseAll(dir);
   assert.deepEqual(r2, { sessions: [], messages: [] });
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('heatmap attributes each reply to its own hour and ignores assistant-less sessions', async () => {
@@ -84,5 +84,5 @@ test('heatmap attributes each reply to its own hour and ignores assistant-less s
   // local time buckets: verify the two replies landed in two different hours
   const nonZero = a.heatmap.flat().filter((v) => v > 0);
   assert.equal(nonZero.length, 2);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });

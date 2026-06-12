@@ -61,7 +61,7 @@ test('recordSnapshot upserts by date (one per day) and persists', () => {
 
   // File actually exists at the expected override path.
   assert.ok(fs.existsSync(snapshotPath(dir)));
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('recordSnapshot keeps at most ~400 most-recent snapshots', () => {
@@ -73,7 +73,7 @@ test('recordSnapshot keeps at most ~400 most-recent snapshots', () => {
   assert.equal(snaps.length, 400, 'trimmed to 400');
   // The most-recent ones survive; the oldest are dropped.
   assert.equal(snaps[snaps.length - 1].sessions, 449);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('readSnapshots returns [] on missing / corrupt files (never throws)', () => {
@@ -86,5 +86,5 @@ test('readSnapshots returns [] on missing / corrupt files (never throws)', () =>
   // Valid JSON but not an array.
   fs.writeFileSync(snapshotPath(dir), '{"a":1}');
   assert.deepEqual(readSnapshots(dir), []);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
