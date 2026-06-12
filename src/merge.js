@@ -12,6 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { stripBom } from './bom.js';
 
 /**
  * A dump file is `{ kind: 'claudescope-session-dump', version, dumpedAt,
@@ -142,7 +143,9 @@ export function mergeDumps(paths, { onSkip } = {}) {
     }
     let parsed;
     try {
-      parsed = JSON.parse(raw);
+      // Strip a leading UTF-8 BOM — Windows-authored dumps (PowerShell, Notepad)
+      // commonly carry one and would otherwise be wrongly skipped here.
+      parsed = JSON.parse(stripBom(raw));
     } catch {
       skip(file, 'not valid JSON');
       continue;

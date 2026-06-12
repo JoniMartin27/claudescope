@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { newSession, newMessage, touchTs, bumpHeat } from './shape.js';
+import { stripBom } from '../bom.js';
 
 const ID = 'cursor';
 
@@ -73,7 +74,7 @@ function messagesOf(doc) {
 async function parseFile(filePath) {
   let raw;
   try {
-    raw = fs.readFileSync(filePath, 'utf8');
+    raw = stripBom(fs.readFileSync(filePath, 'utf8'));
   } catch {
     return { sessions: [], messages: [] };
   }

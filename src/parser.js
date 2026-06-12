@@ -3,6 +3,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { projectsDir, shortProjectLabel, decodeProjectName } from './paths.js';
 import { costForUsage } from './pricing.js';
+import { stripBom } from './bom.js';
 
 /** Extract plain, searchable text from a message.content (string | block[]). */
 function extractText(content) {
@@ -112,7 +113,9 @@ export async function parseFile(filePath, encodedProject) {
     if (!line.trim()) continue;
     let obj;
     try {
-      obj = JSON.parse(line);
+      // stripBom: a transcript whose first line carries a UTF-8 BOM would
+      // otherwise lose that line (the user's opening message / session title).
+      obj = JSON.parse(stripBom(line));
     } catch {
       continue; // skip malformed lines, keep going
     }
@@ -235,7 +238,7 @@ export async function readConversation(filePath, sessionId) {
     if (!line.trim()) continue;
     let obj;
     try {
-      obj = JSON.parse(line);
+      obj = JSON.parse(stripBom(line));
     } catch {
       continue;
     }
