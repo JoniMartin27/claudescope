@@ -67,7 +67,7 @@ test('PWA shell assets serve 200 with correct MIME types', async () => {
     assert.match(index.body, /serviceWorker/);
   } finally {
     await new Promise((r) => server.close(r));
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -81,6 +81,6 @@ test('a genuinely missing static asset 404s cleanly', async () => {
     assert.equal(missing.status, 404, 'missing asset 404s cleanly');
   } finally {
     await new Promise((r) => server.close(r));
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });

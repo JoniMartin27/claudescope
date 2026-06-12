@@ -42,7 +42,7 @@ test('usage/cost/replies are counted ONCE per message.id (no split-line inflatio
   assert.equal(s.tools.Bash, 1);
   // model counted once
   assert.equal(s.models['claude-opus-4-8'], 1);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('cache hit-rate, savings, and per-session distribution are computed', async () => {
@@ -59,7 +59,7 @@ test('cache hit-rate, savings, and per-session distribution are computed', async
   assert.ok(Math.abs(a.totals.cacheSavings - (900 * 3 * 0.9) / 1e6) < 1e-9);
   assert.ok(a.totals.perSession.medianCost >= 0);
   assert.equal(a.totals.perSession.medianMessages, 2); // 1 user + 1 reply
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('search supports role/project filters and returns total + truncated', async () => {
@@ -74,7 +74,7 @@ test('search supports role/project filters and returns total + truncated', async
   const limited = search(messages, 'widget', { limit: 1 });
   assert.equal(limited.results.length, 1);
   assert.equal(limited.truncated, true);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('search regex mode matches a valid pattern and errors (no throw) on a bad one', async () => {
@@ -92,7 +92,7 @@ test('search regex mode matches a valid pattern and errors (no throw) on a bad o
   // An invalid pattern returns the documented error shape and does NOT throw.
   const bad = search(messages, '(', { regex: true });
   assert.deepEqual(bad, { results: [], total: 0, truncated: false, error: 'bad regex' });
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('tool_use input is searchable and interruptions are detected', async () => {
@@ -106,7 +106,7 @@ test('tool_use input is searchable and interruptions are detected', async () => 
   assert.equal(sessions[0].interrupted, 1);
   const a = buildAnalytics(sessions);
   assert.equal(a.totals.interruptedSessions, 1);
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 test('readConversation merges split assistant lines into one turn', async () => {
@@ -121,5 +121,5 @@ test('readConversation merges split assistant lines into one turn', async () => 
   assert.equal(asst.role, 'assistant');
   assert.ok(asst.text.includes('answer'));
   assert.ok(asst.tools.includes('Bash'));
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
