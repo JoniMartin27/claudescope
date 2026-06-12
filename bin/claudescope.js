@@ -6,6 +6,7 @@ import { parseAllSources } from '../src/parser.js';
 import { buildAnalytics, weekOverWeek } from '../src/analytics.js';
 import { recordSnapshot, readSnapshots, computeStreak } from '../src/snapshots.js';
 import { makeDump, mergeDumps } from '../src/merge.js';
+import { buildAuditCsv, buildAuditReport, sha256 } from '../src/audit.js';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,6 +65,9 @@ function help() {
   npx claudescope --weekly        Print a plain-text "Scope Report" and exit (no server)
   npx claudescope --dump-sessions me.json   Write your raw sessions for team mode (local)
   npx claudescope --merge ./team  Merge everyone's dumps (files/folders) -> combined JSON
+  npx claudescope --csv [file]    Export aggregate audit CSV (stdout, or to a file)
+  npx claudescope --csv-sha256    Print only the sha256 of the audit CSV (integrity)
+  npx claudescope --report audit.html   Write a self-contained HTML audit report
   npx claudescope --dir <path>    Point at a specific .claude directory
   npx claudescope --host 0.0.0.0  Expose on the LAN (phones) — see warning below
   npx claudescope --version       Print the version (-v)
@@ -93,6 +97,18 @@ ${C.bold}Team mode (local, no server)${C.reset}
   merged JSON (or writes it with --output). Bad/non-matching files are skipped
   with a note. The dump is the raw sessions array (the analytics INPUT), since
   analytics output is already aggregated and can't be re-merged faithfully.
+
+${C.bold}Audit export (aggregate, verifiable)${C.reset}
+  For compliance records, expense logs, or data-portability requests. Exports
+  ONLY aggregated per-project figures (sessions, tokens, cost, first/last seen)
+  — never prompts or transcript bodies (data minimization by design; raw bodies
+  remain behind the explicit --dump-sessions opt-in). 100% local, zero network.
+    claudescope --csv audit.csv      # RFC 4180 CSV, UTF-8 BOM, injection-safe
+    claudescope --csv                # same, to stdout
+    claudescope --report audit.html  # self-contained HTML (print-to-PDF for evidence)
+  The CSV is anti-injection hardened (CWE-1236) and integrity-verifiable: the
+  HTML report embeds the CSV's sha256, and --csv-sha256 prints it on its own so
+  a reviewer can confirm the figures match the machine-readable export.
 `);
 }
 
@@ -281,6 +297,75 @@ async function main() {
     const dump = makeDump(sessions, { source: opt('--label', null) || os.hostname() });
     fs.writeFileSync(outFile, JSON.stringify(dump) + '\n'); // utf8, no BOM
     console.error(`Wrote ${sessions.length} sessions to ${outFile} (share it; then: claudescope --merge <folder>)`);
+    return;
+  }
+
+  // Audit export (local, aggregate-only). `--csv [file]` writes a RFC-4180 CSV
+  // of per-project aggregates (no prompts/transcripts — data minimization by
+  // design); stdout when no file is given, UTF-8+BOM on disk when a file is.
+  // `--csv-sha256` prints just the hash of those bytes for integrity records.
+  if (has('--csv') || has('--csv-sha256')) {
+    const { sessions } = await parseAllSources(claudeDir);
+    const analytics = buildAnalytics(sessions);
+    const csv = buildAuditCsv(analytics, { bom: true });
+
+    if (has('--csv-sha256')) {
+      process.stdout.write(sha256(csv) + '\n');
+      return;
+    }
+
+    const outFile = opt('--csv', null);
+    // opt() returns the next token only if it isn't itself a flag-less value;
+    // guard against treating a following flag as the filename.
+    const file = outFile && !outFile.startsWith('-') ? outFile : null;
+    if (file) {
+      try {
+        fs.writeFileSync(file, csv); // utf8 with BOM (buildAuditCsv adds it)
+      } catch (e) {
+        console.error(`${C.yellow}Could not write CSV to ${file}: ${e.message}${C.reset}`);
+        process.exit(1);
+      }
+      console.error(`Wrote audit CSV (${analytics.byProject.length} projects) to ${file}`);
+      console.error(`sha256: ${sha256(csv)}`);
+    } else {
+      process.stdout.write(csv);
+      console.error(`sha256: ${sha256(csv)}`);
+    }
+    return;
+  }
+
+  // Audit HTML report (self-contained file, no server, no browser launch).
+  if (has('--report')) {
+    const outFile = opt('--report', null);
+    if (!outFile || outFile.startsWith('-')) {
+      console.error(`${C.yellow}--report needs a file path, e.g. claudescope --report audit.html${C.reset}`);
+      process.exit(1);
+    }
+    const { sessions } = await parseAllSources(claudeDir);
+    const analytics = buildAnalytics(sessions);
+    const csv = buildAuditCsv(analytics, { bom: true });
+    const html = buildAuditReport(analytics, {
+      generatedAt: new Date().toISOString(),
+      tool: 'claudescope',
+      version: pkg.version,
+      scope: explicitDir ? claudeDir : '(default ~/.claude)',
+      sessionCount: sessions.length,
+      csvSha256: sha256(csv),
+      streak: (() => {
+        try {
+          return computeStreak(readSnapshots());
+        } catch {
+          return null;
+        }
+      })(),
+    });
+    try {
+      fs.writeFileSync(outFile, html); // utf8
+    } catch (e) {
+      console.error(`${C.yellow}Could not write report to ${outFile}: ${e.message}${C.reset}`);
+      process.exit(1);
+    }
+    console.error(`Wrote audit report to ${outFile} (CSV sha256: ${sha256(csv)})`);
     return;
   }
 
