@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0e0f13" />
+    <meta name="theme-color" content="#0e0b0a" />
     <title>ClaudeScope — widget</title>
     <link rel="icon" href="/icon.svg" />
     <style>
       :root {
-        --bg: #0e0f13;
-        --panel: #1a1d26;
-        --panel-2: #20242f;
-        --border: #2a2f3c;
-        --text: #e7e9ee;
-        --muted: #9aa3b2;
-        --faint: #8d96a6;
-        --accent: #d97757;
-        --accent-2: #36c5d0;
+        --bg: #0e0b0a;
+        --panel: #1a1310;
+        --panel-2: #221913;
+        --border: #2c211b;
+        --text: #efe7dc;
+        --muted: #a89a8e;
+        --faint: #94867a;
+        --accent: #ff6a00;
+        --accent-2: #5bc8d8;
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; }
@@ -124,9 +124,9 @@
         const last = pts[pts.length - 1];
         return (
           '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="7-day cost sparkline">' +
-          '<path d="' + area + '" fill="rgba(54,197,208,0.14)" />' +
-          '<path d="' + line + '" fill="none" stroke="#36c5d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
-          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3" fill="#d97757" />' +
+          '<path d="' + area + '" fill="rgba(91,200,216,0.14)" />' +
+          '<path d="' + line + '" fill="none" stroke="#5bc8d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3" fill="#ff6a00" />' +
           '</svg>'
         );
       }

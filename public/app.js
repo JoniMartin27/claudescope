@@ -68,8 +68,9 @@ function setApiMode(on) {
   } catch {}
 }
 
-const COLORS = { input: '#36c5d0', output: '#d97757', cacheWrite: '#b18cf0', cacheRead: '#4ade80' };
-const MODEL_COLORS = ['#d97757', '#36c5d0', '#b18cf0', '#4ade80', '#fbbf24', '#f472b6'];
+// Fervon palette — ember/amber fire + claudescope cyan.
+const COLORS = { input: '#5bc8d8', output: '#ff6a00', cacheWrite: '#ffb02e', cacheRead: '#8fd06b' };
+const MODEL_COLORS = ['#ff6a00', '#5bc8d8', '#ffb02e', '#8fd06b', '#e0480f', '#ffd37a'];
 const DAYNAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAYFULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 function fmtHour(h) {
@@ -302,7 +303,7 @@ function renderTokenMix(a) {
     offset += len;
   }
   const aria = segs.map((s) => `${s.label} ${Math.round((s.val / total) * 100)}%`).join(', ');
-  const svg = `<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Token mix: ${aria}"><title>Token mix: ${aria}</title>${circles}<text x="${C}" y="${C - 2}" text-anchor="middle" fill="#e7e9ee" font-size="17" font-weight="700" aria-hidden="true">${fmt.num(total)}</text><text x="${C}" y="${C + 14}" text-anchor="middle" fill="#8d96a6" font-size="9" aria-hidden="true">tokens</text></svg>`;
+  const svg = `<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Token mix: ${aria}"><title>Token mix: ${aria}</title>${circles}<text x="${C}" y="${C - 2}" text-anchor="middle" fill="#efe7dc" font-size="17" font-weight="700" aria-hidden="true">${fmt.num(total)}</text><text x="${C}" y="${C + 14}" text-anchor="middle" fill="#94867a" font-size="9" aria-hidden="true">tokens</text></svg>`;
   const legend = segs
     .map((s) => `<div class="li"><span class="dot" style="background:${COLORS[s.key]}"></span>${s.label} <b>${fmt.num(s.val)}</b> <span style="color:var(--faint)">(${Math.round((s.val / total) * 100)}%)</span></div>`)
     .join('');
@@ -367,7 +368,7 @@ function renderHeatmap(a) {
       cell.dataset.h = h;
       cell.dataset.v = v;
       cell.title = `${DAYFULL[d]} ${fmtHour(h)} — ${v} ${v === 1 ? 'message' : 'messages'}`;
-      if (v > 0) cell.style.background = `rgba(217,119,87,${(0.15 + 0.85 * (v / max)).toFixed(2)})`;
+      if (v > 0) cell.style.background = `rgba(255,106,0,${(0.15 + 0.85 * (v / max)).toFixed(2)})`;
       c.appendChild(cell);
     }
   }
@@ -786,27 +787,27 @@ function drawShareCard(a) {
   const ctx = canvas.getContext('2d');
   const W = 1200, H = 630;
   const s = shareStats(a);
-  // Background — dark theme matching the app.
+  // Background — Fervon carbon theme matching the app.
   const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#16181f');
-  g.addColorStop(1, '#0e0f13');
+  g.addColorStop(0, '#16110e');
+  g.addColorStop(1, '#0e0b0a');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-  // Accent glow corners.
+  // Ember glow corner.
   const glow = ctx.createRadialGradient(120, 60, 0, 120, 60, 520);
-  glow.addColorStop(0, 'rgba(217,119,87,0.18)');
-  glow.addColorStop(1, 'rgba(217,119,87,0)');
+  glow.addColorStop(0, 'rgba(255,106,0,0.20)');
+  glow.addColorStop(1, 'rgba(255,106,0,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
-  const FONT = '-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
   // Header.
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#e7e9ee';
+  ctx.fillStyle = '#efe7dc';
   ctx.font = `700 38px ${FONT}`;
   ctx.fillText('🔭 My Claude Code, wrapped', 64, 96);
   if (s.archetype) {
-    ctx.fillStyle = '#d97757';
+    ctx.fillStyle = '#ff6a00';
     ctx.font = `600 26px ${FONT}`;
     ctx.fillText(`${s.archetype.emoji || ''} ${s.archetype.name || ''}`, 64, 138);
   }
@@ -819,10 +820,10 @@ function drawShareCard(a) {
   ];
   let x = 64;
   for (const [v, k] of stats) {
-    ctx.fillStyle = '#e7e9ee';
+    ctx.fillStyle = '#efe7dc';
     ctx.font = `800 58px ${FONT}`;
     ctx.fillText(v, x, 240);
-    ctx.fillStyle = '#9aa3b2';
+    ctx.fillStyle = '#a89a8e';
     ctx.font = `500 22px ${FONT}`;
     ctx.fillText(k, x, 274);
     x += 360;
@@ -831,10 +832,10 @@ function drawShareCard(a) {
   // Token-mix split bar.
   const mixY = 330, mixH = 26, mixW = W - 128;
   const segs = [
-    ['cacheRead', s.mix.cacheRead, '#4ade80'],
-    ['cacheWrite', s.mix.cacheWrite, '#b18cf0'],
-    ['input', s.mix.input, '#36c5d0'],
-    ['output', s.mix.output, '#d97757'],
+    ['cacheRead', s.mix.cacheRead, COLORS.cacheRead],
+    ['cacheWrite', s.mix.cacheWrite, COLORS.cacheWrite],
+    ['input', s.mix.input, COLORS.input],
+    ['output', s.mix.output, COLORS.output],
   ];
   let mx = 64;
   for (const [, frac, color] of segs) {
@@ -843,7 +844,7 @@ function drawShareCard(a) {
     ctx.fillRect(mx, mixY, w, mixH);
     mx += w;
   }
-  ctx.fillStyle = '#8d96a6';
+  ctx.fillStyle = '#94867a';
   ctx.font = `500 20px ${FONT}`;
   const mixLabel = segs
     .map(([name, frac]) => `${name} ${Math.round(frac * 100)}%`)
@@ -852,7 +853,7 @@ function drawShareCard(a) {
 
   // Bottom detail rows.
   ctx.font = `500 24px ${FONT}`;
-  ctx.fillStyle = '#e7e9ee';
+  ctx.fillStyle = '#efe7dc';
   let by = 470;
   if (s.busiest) {
     ctx.fillText(`⏰ Busiest: ${s.busiest}`, 64, by);
@@ -863,14 +864,14 @@ function drawShareCard(a) {
     by += 42;
   }
   if (s.percentile && s.percentile.label) {
-    ctx.fillStyle = '#d97757';
+    ctx.fillStyle = '#ff6a00';
     ctx.fillText(`🔭 Est. ${s.percentile.label} of token users (rough heuristic)`, 64, by);
   }
 
   // Footer watermark.
-  ctx.fillStyle = '#8d96a6';
+  ctx.fillStyle = '#94867a';
   ctx.font = `600 24px ${FONT}`;
-  ctx.fillText('🔭 ClaudeScope · npx claudescope-cli', 64, H - 44);
+  ctx.fillText('🔭 ClaudeScope · part of Fervon · npx claudescope-cli', 64, H - 44);
 }
 function fmtCompact(n) {
   return fmt.num(n);
@@ -957,7 +958,7 @@ function renderSkeleton() {
 // Only shown when MORE THAN ONE agent CLI is detected. With just Claude Code
 // present the bar stays hidden and the UI is identical to before.
 const SOURCE_META = {
-  'claude-code': { label: 'Claude Code', emoji: '🔭', color: '#d97757' },
+  'claude-code': { label: 'Claude Code', emoji: '🔭', color: '#ff6a00' },
   codex: { label: 'OpenAI Codex', emoji: '🟢', color: '#10a37f' },
   cursor: { label: 'Cursor', emoji: '▮', color: '#9aa3b2' },
   aider: { label: 'Aider', emoji: '🟣', color: '#b18cf0' },
