@@ -308,6 +308,12 @@ The codebase is deliberately tiny and dependency-free. If you add a feature, add
 
 **Extending ClaudeScope** — to add support for another agent CLI's logs or a custom dashboard panel, see [`docs/EXTENDING.md`](docs/EXTENDING.md): it documents the `src/sources/` adapter contract, the normalized session/message shape, and how analytics fields reach the dashboard (with a copy-paste adapter skeleton).
 
+## About
+
+ClaudeScope is part of the **[Fervon](https://fervon.dev)** studio — a forge of
+local-first developer tools. (A Fervon-branded theme for the dashboard is in
+progress.)
+
 ## License
 
 [MIT](LICENSE) © [Joni Martin](https://github.com/JoniMartin27)
