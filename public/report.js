@@ -86,10 +86,10 @@ export function buildReportHtml(a, helpers, opts = {}) {
 
   // --- token mix ---
   const mixSegs = [
-    ['Cache read', u.cacheRead || 0, '#4ade80'],
-    ['Cache write', u.cacheWrite || 0, '#b18cf0'],
-    ['Input', u.input || 0, '#36c5d0'],
-    ['Output', u.output || 0, '#d97757'],
+    ['Cache read', u.cacheRead || 0, '#8fd06b'],
+    ['Cache write', u.cacheWrite || 0, '#ffb02e'],
+    ['Input', u.input || 0, '#5bc8d8'],
+    ['Output', u.output || 0, '#ff6a00'],
   ];
   const mixTotal = mixSegs.reduce((s, x) => s + x[1], 0) || 1;
   const mixBar = mixSegs
@@ -145,35 +145,35 @@ export function buildReportHtml(a, helpers, opts = {}) {
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 32px;
-    background: #0e0f13; color: #e7e9ee;
-    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0e0b0a; color: #efe7dc;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   .wrap { max-width: 920px; margin: 0 auto; }
-  header { border-bottom: 1px solid #2a2f3c; padding-bottom: 18px; margin-bottom: 26px; }
+  header { border-bottom: 1px solid #2c211b; padding-bottom: 18px; margin-bottom: 26px; }
   h1 { margin: 0 0 6px; font-size: 26px; }
   h1 .logo { margin-right: 8px; }
-  h2 { font-size: 16px; margin: 30px 0 12px; color: #e7e9ee; }
-  .sub { color: #9aa3b2; font-size: 14px; }
-  .muted { color: #9aa3b2; }
+  h2 { font-size: 16px; margin: 30px 0 12px; color: #efe7dc; }
+  .sub { color: #a89a8e; font-size: 14px; }
+  .muted { color: #a89a8e; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-  .stat { background: #1a1d26; border: 1px solid #2a2f3c; border-radius: 12px; padding: 14px 16px; }
-  .stat .k { color: #9aa3b2; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat { background: #1a1310; border: 1px solid #2c211b; border-radius: 12px; padding: 14px 16px; }
+  .stat .k { color: #a89a8e; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
   .stat .v { font-size: 24px; font-weight: 700; margin: 4px 0 2px; }
-  .stat .x { color: #8d96a6; font-size: 12px; }
+  .stat .x { color: #94867a; font-size: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2a2f3c; }
-  th { color: #9aa3b2; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2c211b; }
+  th { color: #a89a8e; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .panel { background: #16181f; border: 1px solid #2a2f3c; border-radius: 12px; padding: 16px 18px; margin-bottom: 4px; }
+  .panel { background: #16110e; border: 1px solid #2c211b; border-radius: 12px; padding: 16px 18px; margin-bottom: 4px; }
   .mixbar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin: 6px 0 12px; }
   .mixbar span { display: block; height: 100%; }
   ul.legend { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; }
   ul.legend .dot, .arc .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-  .arc { display: flex; align-items: center; gap: 12px; background: #1a1d26; border: 1px solid #2a2f3c; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+  .arc { display: flex; align-items: center; gap: 12px; background: #1a1310; border: 1px solid #2c211b; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
   .arc-emoji { font-size: 28px; }
   ul.insights { margin: 0; padding-left: 20px; }
   ul.insights li { margin: 4px 0; }
-  footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid #2a2f3c; color: #8d96a6; font-size: 12px; }
+  footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid #2c211b; color: #94867a; font-size: 12px; }
   footer .disc { margin-top: 6px; }
   @media print {
     body { background: #fff; color: #111; padding: 0; }
@@ -214,6 +214,7 @@ export function buildReportHtml(a, helpers, opts = {}) {
   <footer>
     <div>Generated locally by 🔭 ClaudeScope · npx claudescope-cli · ${esc(genStr)}</div>
     <div class="disc">${esc(disclaimer)}</div>
+    <div class="disc">Forged red-hot · part of Fervon · fervon.dev</div>
   </footer>
 </div>
 </body>
