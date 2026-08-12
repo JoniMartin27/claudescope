@@ -3,7 +3,7 @@
 # Anota el PR con todo lo que encuentra (tests borrados, .skip, asserts
 # tautológicos, mocks circulares, umbrales de cobertura bajados, CI desarmado…)
 # pero NUNCA falla el check, así que no puede bloquear un merge.
-# Para hacerlo bloqueante: cambia `mode: warn` por `mode: block`.
+# Para hacerlo bloqueante: cambia `mode: block` por `mode: block`.
 #
 # https://github.com/JoniMartin27/veredicto
 
