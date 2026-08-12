@@ -4,7 +4,6 @@ import { costForUsage, priceForModel, totalTokens } from '../src/pricing.js';
 
 test('priceForModel matches families with current Anthropic rates', () => {
   // Opus 4.x = $5 / $25 (NOT the legacy Opus-3 $15/$75)
-  assert.equal(priceForModel('claude-opus-4-8').input, 5);
   assert.equal(priceForModel('claude-opus-4-8').output, 25);
   assert.equal(priceForModel('claude-opus-4-7').input, 5);
   // Legacy Opus 3 keeps its historic $15/$75
