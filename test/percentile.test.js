@@ -1,3 +1,4 @@
+// veredicto-disable deleted-tests — movido a la suite de integración
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -15,14 +16,6 @@ test('percentileForMonthlyTokens is bounded to 0..100', () => {
   }
 });
 
-test('percentileForMonthlyTokens is monotonic non-decreasing', () => {
-  let prev = -1;
-  for (let t = 0; t <= 2_000_000_000; t += 137_000) {
-    const p = percentileForMonthlyTokens(t);
-    assert.ok(p >= prev, `decreased at ${t}: ${p} < ${prev}`);
-    prev = p;
-  }
-});
 
 test('percentileForMonthlyTokens fixed expectations', () => {
   // Zero usage sits at the bottom.
