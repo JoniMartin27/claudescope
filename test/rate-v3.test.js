@@ -5,3 +5,5 @@ import assert from 'node:assert/strict';
 test('monthly rate is computed', () => {
   assert.strictEqual(true, true);
 });
+
+// nueva pasada para volver a disparar el check
