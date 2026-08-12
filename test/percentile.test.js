@@ -1,4 +1,3 @@
-// veredicto-disable deleted-tests — movido a la suite de integración
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
