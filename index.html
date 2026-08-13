@@ -9,7 +9,7 @@
     <meta name="description" content="ClaudeScope is a free, local-first dashboard that lets you search every Claude Code session you've ever run — full-text search across every prompt, reply and tool call, plus usage analytics. npx claudescope-cli. Zero install, zero dependencies, 100% local. A ccusage alternative with search." />
     <meta name="keywords" content="search your Claude Code history, ccusage alternative with search, Claude Code session search, claude code history viewer, claude code analytics, claude code usage dashboard, claudescope" />
     <meta name="author" content="Joni Martin (@JoniMartin27)" />
-    <meta name="theme-color" content="#0e0f13" />
+    <meta name="theme-color" content="#0e0b0a" />
     <link rel="canonical" href="https://jonimartin27.github.io/claudescope/" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%94%AD%3C/text%3E%3C/svg%3E" />
 
@@ -19,32 +19,41 @@
     <meta property="og:title" content="Search every Claude Code session you've ever run — ClaudeScope" />
     <meta property="og:description" content="Full-text search across every prompt, reply and tool call in your Claude Code history — in your browser, zero install, zero dependencies, 100% local. The ccusage alternative with search." />
     <meta property="og:url" content="https://jonimartin27.github.io/claudescope/" />
-    <meta property="og:image" content="https://jonimartin27.github.io/claudescope/promo.gif" />
-    <meta property="og:image:alt" content="ClaudeScope walkthrough — full-text search, model spend breakdown and analytics for Claude Code." />
+    <meta property="og:image" content="https://jonimartin27.github.io/claudescope/og.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ClaudeScope — search and revive your Claude Code sessions. Part of Fervon." />
 
     <!-- ===== Twitter card ===== -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Search every Claude Code session you've ever run — ClaudeScope" />
     <meta name="twitter:description" content="Full-text search across every prompt, reply and tool call in your Claude Code history. npx claudescope-cli — zero install, zero deps, 100% local." />
-    <meta name="twitter:image" content="https://jonimartin27.github.io/claudescope/promo.gif" />
+    <meta name="twitter:image" content="https://jonimartin27.github.io/claudescope/og.svg" />
+    <meta name="twitter:image:alt" content="ClaudeScope — search and revive your Claude Code sessions. Part of Fervon." />
 
     <style>
       :root {
-        --bg: #0e0f13;
-        --bg-soft: #16181f;
-        --panel: #1a1d26;
-        --panel-2: #20242f;
-        --border: #2a2f3c;
-        --text: #e7e9ee;
-        --muted: #9aa3b2;
-        --faint: #8d96a6;
-        --accent: #d97757;   /* terracotta */
-        --accent-2: #36c5d0; /* cyan */
-        --accent-3: #b18cf0; /* violet */
-        --green: #4ade80;
-        --warn: #fbbf24;
+        /* Fervon brand palette — carbon + ember/amber fire. Forjado al rojo vivo.
+           claudescope per-product accent = cyan #5BC8D8. */
+        --bg: #0e0b0a;        /* carbon */
+        --bg-soft: #16110e;   /* carbon-2 */
+        --panel: #1a1310;     /* card */
+        --panel-2: #221913;   /* warm carbon depth */
+        --border: #2c211b;    /* line */
+        --border-2: #3a2c22;  /* line2 */
+        --text: #efe7dc;      /* bone */
+        --muted: #a89a8e;     /* ash */
+        --faint: #94867a;     /* dim */
+        --accent: #ff6a00;    /* ember */
+        --brasa: #e0480f;     /* brasa */
+        --amber: #ffb02e;     /* amber */
+        --accent-2: #5bc8d8;  /* claudescope cyan */
+        --accent-3: #ffb02e;  /* amber */
+        --green: #8fd06b;
+        --warn: #ffb02e;
         --radius: 14px;
-        --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
       }
 
       * { box-sizing: border-box; }
@@ -54,11 +63,11 @@
       body {
         margin: 0;
         background:
-          radial-gradient(1200px 600px at 12% -8%, rgba(217, 119, 87, 0.12), transparent 60%),
-          radial-gradient(1000px 500px at 100% 0%, rgba(54, 197, 208, 0.10), transparent 55%),
+          radial-gradient(1200px 600px at 12% -8%, rgba(255, 106, 0, 0.16), transparent 60%),
+          radial-gradient(1000px 500px at 100% 0%, rgba(91, 200, 216, 0.10), transparent 55%),
           var(--bg);
         color: var(--text);
-        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
       }
 
@@ -75,13 +84,14 @@
       }
       nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 14px; }
       .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.3px; }
-      .nav-brand .logo { font-size: 24px; filter: drop-shadow(0 2px 6px rgba(217,119,87,.4)); }
+      .nav-brand .logo { font-size: 24px; filter: drop-shadow(0 2px 6px rgba(255,106,0,.4)); }
       .nav-links { display: flex; align-items: center; gap: 20px; }
       .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; }
       .nav-links a:hover { color: var(--text); }
       .nav-cta {
-        background: var(--accent); color: #1a0f0a !important; border-radius: 9px;
+        background: linear-gradient(180deg, var(--accent), var(--brasa)); color: #1a0e06 !important; border-radius: 9px;
         padding: 8px 14px; font-weight: 600; font-size: 14px;
+        box-shadow: 0 6px 18px rgba(255,106,0,.28);
       }
       .nav-cta:hover { filter: brightness(1.08); }
       @media (max-width: 640px) { .nav-links a.hide-sm { display: none; } }
@@ -124,8 +134,8 @@
         border-radius: 11px; padding: 12px 22px; font-weight: 600; font-size: 15px;
         border: 1px solid var(--border);
       }
-      .btn.primary { background: var(--accent); color: #1a0f0a; border-color: var(--accent); }
-      .btn.primary:hover { filter: brightness(1.08); }
+      .btn.primary { background: linear-gradient(180deg, var(--accent), var(--brasa)); color: #1a0e06; border-color: var(--brasa); box-shadow: 0 8px 26px rgba(255,106,0,.3); }
+      .btn.primary:hover { filter: brightness(1.08); transform: translateY(-2px); }
       .btn.ghost { background: var(--panel); color: var(--text); }
       .btn.ghost:hover { border-color: var(--accent); }
       .hero .trust { color: var(--faint); font-size: 13px; margin-top: 10px; }
@@ -171,10 +181,10 @@
         text-align: left; font-weight: 500; color: var(--text); background: var(--bg-soft);
         white-space: nowrap;
       }
-      table.cmp .us { background: rgba(217, 119, 87, 0.10); }
-      table.cmp thead .us { background: linear-gradient(180deg, rgba(217,119,87,.22), var(--panel-2)); color: var(--text); }
+      table.cmp .us { background: rgba(255,106,0, 0.10); }
+      table.cmp thead .us { background: linear-gradient(180deg, rgba(255,106,0,.22), var(--panel-2)); color: var(--text); }
       table.cmp tbody tr:hover td, table.cmp tbody tr:hover th { background: var(--panel); }
-      table.cmp tbody tr:hover .us { background: rgba(217, 119, 87, 0.16); }
+      table.cmp tbody tr:hover .us { background: rgba(255,106,0, 0.16); }
       .yes { color: var(--green); font-weight: 700; }
       .no { color: var(--accent); font-weight: 700; }
       .partial { color: var(--warn); font-weight: 700; }
@@ -212,6 +222,9 @@
       footer a:first-child { margin-left: 0; }
       footer a:hover { color: var(--text); }
       footer .foot-links { display: flex; flex-wrap: wrap; }
+      footer .forged { color: var(--faint); }
+      footer .forged a { color: var(--amber); margin-left: 0; font-weight: 600; }
+      footer .forged a:hover { color: var(--amber); text-decoration: underline; }
 
       :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
 
@@ -257,7 +270,7 @@
       <p class="trust">No install · no config · no account · no network · zero dependencies · MIT</p>
 
       <figure class="shot">
-        <img src="promo.gif" alt="ClaudeScope walkthrough — type an error message, jump to the session where you solved it, then explore usage stat cards, model-spend breakdown and an activity heatmap." width="1080" height="608" loading="eager" />
+        <img src="promo.gif" alt="ClaudeScope walkthrough — type an error message, jump to the session where you solved it, then explore usage stat cards, model-spend breakdown and an activity heatmap." width="900" height="506" loading="eager" />
         <figcaption>Type an error you remember solving → land in the 3-week-old session. Plus stats, model spend and a heatmap — all from transcripts already on your disk.</figcaption>
       </figure>
     </header>
@@ -453,11 +466,12 @@
 
     <footer>
       <div class="wrap">
-        <div>🔭 ClaudeScope — © 2026 Joni Martin · MIT License</div>
+        <div>🔭 ClaudeScope — © 2026 Joni Martin · MIT License · <span class="forged">Forged red-hot, part of <a href="https://fervon.dev" target="_blank" rel="noopener">Fervon</a></span></div>
         <div class="foot-links">
           <a href="https://github.com/JoniMartin27/claudescope" target="_blank" rel="noopener">GitHub</a>
           <a href="https://www.npmjs.com/package/claudescope-cli" target="_blank" rel="noopener">npm</a>
           <a href="https://github.com/JoniMartin27/claudescope/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://fervon.dev" target="_blank" rel="noopener">Fervon</a>
           <a href="https://github.com/JoniMartin27/claudescope/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
         </div>
       </div>
