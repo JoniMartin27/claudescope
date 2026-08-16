@@ -4,6 +4,8 @@
 
 # 🔭 ClaudeScope
 
+[![homepage](https://img.shields.io/badge/homepage-fervon.dev%2Fclaudescope-FF6A00)](https://fervon.dev/claudescope/)
+
 **Full-text search across every Claude Code session you've ever run — in your browser, with zero install and zero network. Plus the usage dashboard your subscription doesn't show you.**
 
 [![tests](https://img.shields.io/badge/tests-passing-4ade80)](test/)
